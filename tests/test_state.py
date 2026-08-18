@@ -17,7 +17,7 @@ def test_la_prima_prenotazione_riesce_la_seconda_no(tmp_path: Path) -> None:
 def test_esito_registrato_e_rileggibile(tmp_path: Path) -> None:
     with ProcessedStore(tmp_path / "state.sqlite3") as store:
         store.claim("<msg-1@example.com>")
-        store.finalize("<msg-1@example.com>", Decision.FORWARDED, "televisita, 15A10")
+        store.finalize("<msg-1@example.com>", Decision.FORWARDED, "televisita, 1501A")
         assert store.get_decision("<msg-1@example.com>") == "forwarded"
 
 

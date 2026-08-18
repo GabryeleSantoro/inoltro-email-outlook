@@ -5,7 +5,7 @@ Il testo che arriva dall'OCR non e' mai pulito: puo' contenere spazi di troppo
 confusioni fra caratteri simili (O/0, l/1, S/5). Le funzioni di questo modulo
 normalizzano testo e termini cercati prima del confronto, in modo che la
 ricerca resti robusta senza dover ricorrere a fuzzy matching generico (che
-produrrebbe falsi positivi su un codice come 15A10).
+produrrebbe falsi positivi su un codice come 1501A).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def contains_code(haystack_collapsed: str, code: str, fuzzy: bool) -> bool:
     if not fuzzy:
         return False
     # Stessa normalizzazione su entrambi i lati: cosi' "l5A1O" letto dall'OCR
-    # e il codice atteso "15A10" convergono sulla stessa stringa.
+    # e il codice atteso "1501A" convergono sulla stessa stringa.
     return apply_ocr_confusions(needle) in apply_ocr_confusions(haystack_collapsed)
 
 

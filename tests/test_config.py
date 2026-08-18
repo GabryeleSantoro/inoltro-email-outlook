@@ -14,7 +14,7 @@ ocr:
   max_pdf_pages_per_request: 3
 rules:
   keywords: ["televisita"]
-  codes: ["15A10"]
+  codes: ["1501A"]
   mode: all
 forward:
   to: ["destinatario@example.com"]
@@ -37,7 +37,7 @@ def test_carica_configurazione_valida(tmp_path: Path, monkeypatch: pytest.Monkey
     settings = Settings.load(write_config(tmp_path, VALID_YAML))
 
     assert settings.ocr.api_key == "chiave-di-prova"
-    assert settings.rules.codes == ["15A10"]
+    assert settings.rules.codes == ["1501A"]
     assert settings.forward.dry_run is True
     # Le estensioni vengono normalizzate: minuscole e con il punto iniziale.
     assert settings.attachments.allowed_extensions == [".pdf", ".jpg"]
@@ -95,7 +95,7 @@ def test_config_di_esempio_e_valido(monkeypatch: pytest.MonkeyPatch) -> None:
     example = Path(__file__).resolve().parents[1] / "config.example.yaml"
     settings = Settings.load(example)
     assert settings.rules.keywords == ["televisita"]
-    assert settings.rules.codes == ["15A10"]
+    assert settings.rules.codes == ["1501A"]
     assert settings.forward.dry_run is True  # default prudente
 
 

@@ -22,7 +22,7 @@ ocr:
   engine: 2
 rules:
   keywords: ["televisita"]
-  codes: ["15A10"]
+  codes: ["1501A"]
   mode: all
 forward:
   to: ["destinatario@example.com"]
@@ -46,7 +46,7 @@ def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_check_file_su_pdf_conforme(config_file: Path, tmp_path: Path, capsys) -> None:
     """PDF con livello di testo: nessuna chiamata di rete, esito 0."""
     pdf = tmp_path / "referto.pdf"
-    pdf.write_bytes(make_pdf(["Richiesta TELEVISITA prestazione 15A10 paziente Rossi"]))
+    pdf.write_bytes(make_pdf(["Richiesta TELEVISITA prestazione 1501A paziente Rossi"]))
 
     code = main(["--config", str(config_file), "check-file", str(pdf)])
 

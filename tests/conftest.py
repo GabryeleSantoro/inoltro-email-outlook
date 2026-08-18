@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import io
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import pytest
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from inoltro_email.config import (
     AttachmentSettings, ForwardSettings, LoggingSettings, OcrSettings,
@@ -28,7 +34,7 @@ def settings(tmp_path: Path) -> Settings:
             max_file_bytes=1_048_576,
             max_pdf_pages_per_request=3,
         ),
-        rules=RuleSettings(keywords=["televisita"], codes=["15A10"], mode="all"),
+        rules=RuleSettings(keywords=["televisita"], codes=["1501A"], mode="all"),
         forward=ForwardSettings(
             to=["destinatario@example.com"],
             subject_prefix="[TELEVISITA] ",

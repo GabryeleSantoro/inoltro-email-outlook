@@ -29,7 +29,7 @@ def build_pipeline(settings: Settings, mail: FakeMailClient, ocr: FakeOcrClient,
 def test_inoltra_quando_l_allegato_soddisfa_i_criteri(settings, store) -> None:
     message = FakeMessage(subject="Impegnativa", attachments={"referto.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(default_text="RICHIESTA TELEVISITA - prestazione 15A10")
+    ocr = FakeOcrClient(default_text="RICHIESTA TELEVISITA - prestazione 1501A")
 
     result = build_pipeline(settings, mail, ocr, store).process_message(message)
 
@@ -50,13 +50,13 @@ def test_non_inoltra_se_manca_il_codice(settings, store) -> None:
 
     assert result.decision is Decision.NO_MATCH
     assert mail.forwarded == []
-    assert result.match is not None and result.match.missing_codes == ["15A10"]
+    assert result.match is not None and result.match.missing_codes == ["1501A"]
 
 
 def test_non_inoltra_se_manca_la_parola(settings, store) -> None:
     message = FakeMessage(attachments={"referto.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(default_text="Prestazione 15A10 erogata in presenza")
+    ocr = FakeOcrClient(default_text="Prestazione 1501A erogata in presenza")
 
     result = build_pipeline(settings, mail, ocr, store).process_message(message)
 
@@ -68,7 +68,7 @@ def test_dry_run_non_invia_nulla(settings, store) -> None:
     settings.forward.dry_run = True
     message = FakeMessage(attachments={"referto.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(default_text="TELEVISITA 15A10")
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
 
     result = build_pipeline(settings, mail, ocr, store).process_message(message)
 
@@ -93,7 +93,7 @@ def test_nessun_doppio_inoltro_dello_stesso_messaggio(settings, store) -> None:
     """L'evento NewMailEx e la scansione di recupero possono sovrapporsi."""
     message = FakeMessage(attachments={"referto.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(default_text="TELEVISITA 15A10")
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
     pipeline = build_pipeline(settings, mail, ocr, store)
 
     first = pipeline.process_message(message)
@@ -112,7 +112,7 @@ def test_si_ferma_al_primo_allegato_conforme(settings, store) -> None:
         "c_terzo.pdf": make_blank_pdf(),
     })
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(texts={"a_primo": "TELEVISITA 15A10"}, default_text="niente")
+    ocr = FakeOcrClient(texts={"a_primo": "TELEVISITA 1501A"}, default_text="niente")
 
     result = build_pipeline(settings, mail, ocr, store).process_message(message)
 
@@ -127,7 +127,7 @@ def test_esamina_tutti_gli_allegati_finche_serve(settings, store) -> None:
         "b_secondo.pdf": make_blank_pdf(),
     })
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(texts={"b_secondo": "TELEVISITA 15A10"}, default_text="niente di rilevante")
+    ocr = FakeOcrClient(texts={"b_secondo": "TELEVISITA 1501A"}, default_text="niente di rilevante")
 
     result = build_pipeline(settings, mail, ocr, store).process_message(message)
 
@@ -138,7 +138,7 @@ def test_esamina_tutti_gli_allegati_finche_serve(settings, store) -> None:
 
 def test_pdf_con_testo_riconosciuto_senza_ocr(settings, store) -> None:
     message = FakeMessage(attachments={
-        "referto.pdf": make_pdf(["Richiesta TELEVISITA prestazione 15A10 paziente Rossi"])
+        "referto.pdf": make_pdf(["Richiesta TELEVISITA prestazione 1501A paziente Rossi"])
     })
     mail = FakeMailClient([message])
     ocr = FakeOcrClient()
@@ -172,7 +172,7 @@ def test_errore_su_outlook_libera_la_prenotazione(settings, store) -> None:
 
     message = FakeMessage(attachments={"referto.pdf": make_blank_pdf()})
     mail = BrokenMail([message])
-    ocr = FakeOcrClient(default_text="TELEVISITA 15A10")
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
     pipeline = build_pipeline(settings, mail, ocr, store)
 
     result = pipeline.process_message(message)
@@ -185,7 +185,7 @@ def test_errore_su_outlook_libera_la_prenotazione(settings, store) -> None:
 def test_process_entry_id_usa_il_client(settings, store) -> None:
     message = FakeMessage(entry_id="ENTRY-42", attachments={"r.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
-    ocr = FakeOcrClient(default_text="TELEVISITA 15A10")
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
     pipeline = build_pipeline(settings, mail, ocr, store)
 
     assert pipeline.process_entry_id("ENTRY-42").decision is Decision.FORWARDED
@@ -201,7 +201,7 @@ def test_process_recent_elabora_tutti_i_messaggi(settings, store) -> None:
         FakeMessage(subject="Senza allegati", message_id="<c@x>", entry_id="E3"),
     ]
     mail = FakeMailClient(messages)
-    ocr = FakeOcrClient(texts={"ok": "TELEVISITA 15A10"}, default_text="altro")
+    ocr = FakeOcrClient(texts={"ok": "TELEVISITA 1501A"}, default_text="altro")
 
     results = build_pipeline(settings, mail, ocr, store).process_recent(30)
 

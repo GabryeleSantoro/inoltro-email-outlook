@@ -143,7 +143,7 @@ class Settings:
         )
         rules = RuleSettings(
             keywords=_as_str_list(rules_raw.get("keywords"), ["televisita"]),
-            codes=_as_str_list(rules_raw.get("codes"), ["15A10"]),
+            codes=_as_str_list(rules_raw.get("codes"), ["1501A"]),
             mode=str(rules_raw.get("mode", "all")).lower(),
             fuzzy_ocr_confusions=bool(rules_raw.get("fuzzy_ocr_confusions", True)),
         )

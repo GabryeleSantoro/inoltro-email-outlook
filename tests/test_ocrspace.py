@@ -35,13 +35,13 @@ def test_estrae_il_testo_da_tutte_le_pagine(image: Path) -> None:
     responses.add(responses.POST, ENDPOINT, status=200, json={
         "ParsedResults": [
             {"ParsedText": "TELEVISITA", "FileParseExitCode": 1},
-            {"ParsedText": "codice 15A10", "FileParseExitCode": 1},
+            {"ParsedText": "codice 1501A", "FileParseExitCode": 1},
         ],
         "OCRExitCode": 1,
         "IsErroredOnProcessing": False,
     })
     result = make_client().parse_file(image)
-    assert "TELEVISITA" in result.text and "15A10" in result.text
+    assert "TELEVISITA" in result.text and "1501A" in result.text
 
 
 @responses.activate
@@ -88,10 +88,10 @@ def test_errore_applicativo_con_http_200(image: Path) -> None:
 def test_riprova_dopo_un_429_e_riesce(image: Path) -> None:
     responses.add(responses.POST, ENDPOINT, status=429)
     responses.add(responses.POST, ENDPOINT, status=200, json={
-        "ParsedResults": [{"ParsedText": "televisita 15A10", "FileParseExitCode": 1}],
+        "ParsedResults": [{"ParsedText": "televisita 1501A", "FileParseExitCode": 1}],
         "OCRExitCode": 1, "IsErroredOnProcessing": False,
     })
-    assert "15A10" in make_client(max_retries=3).parse_file(image).text
+    assert "1501A" in make_client(max_retries=3).parse_file(image).text
     assert len(responses.calls) == 2
 
 
