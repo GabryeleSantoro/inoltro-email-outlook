@@ -1,0 +1,61 @@
+# Configurazione di inoltro-email-outlook
+# Copiare in `config.yaml` e adattare. La chiave API di ocr.space NON va qui:
+# va messa nella variabile d'ambiente OCR_SPACE_API_KEY (file .env).
+
+ocr:
+  endpoint: "https://api.ocr.space/parse/image"
+  # 'ita' e' supportato solo dagli engine 1 e 3. L'engine 2 ignora questo campo
+  # (rileva la lingua da solo) ed e' in genere il piu' accurato sui documenti.
+  language: "ita"
+  engine: 2
+  timeout_seconds: 120
+  max_retries: 3
+  # Limiti del piano gratuito ocr.space: 1 MB per file, 3 pagine per PDF.
+  # Con un piano PRO si possono alzare (es. 5242880 e 999).
+  max_file_bytes: 1048576
+  max_pdf_pages_per_request: 3
+
+rules:
+  # Parole da cercare nel testo estratto dall'allegato.
+  keywords:
+    - "televisita"
+  # Codici: confronto tollerante a spazi e separatori (15 A 10, 15-A10, ...).
+  codes:
+    - "15A10"
+  # all = servono TUTTE le keyword E TUTTI i codici (AND)
+  # any = ne basta uno qualsiasi (OR)
+  mode: "all"
+  # Corregge le confusioni tipiche dell'OCR sui codici (O/0, I/1, L/1, S/5, B/8).
+  # Non viene mai applicato alle keyword.
+  fuzzy_ocr_confusions: true
+
+forward:
+  to:
+    - "destinatario@example.com"
+  cc: []
+  subject_prefix: "[TELEVISITA 15A10] "
+  body_note: "Inoltro automatico: l'allegato soddisfa i criteri configurati."
+  # true = simula soltanto, non invia nulla. Metterlo a false per inoltrare davvero.
+  dry_run: true
+
+outlook:
+  # Cartella da sorvegliare. "Inbox" = Posta in arrivo dell'account predefinito.
+  # Per una sottocartella usare il percorso: "Inbox/Televisite"
+  folder: "Inbox"
+  # All'avvio rilegge i messaggi degli ultimi N minuti (recupera cio' che e'
+  # arrivato mentre il programma era spento). 0 per disattivare.
+  catch_up_minutes: 30
+  # Categoria Outlook applicata ai messaggi inoltrati (vuoto per disattivare).
+  processed_category: "Inoltrata-Televisita"
+
+attachments:
+  allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
+  # Allegati piu' grandi di questo vengono ignorati (byte).
+  max_bytes: 10485760
+
+storage:
+  db_path: "state/processed.sqlite3"
+
+logging:
+  level: "INFO"
+  file: "logs/inoltro.log"
