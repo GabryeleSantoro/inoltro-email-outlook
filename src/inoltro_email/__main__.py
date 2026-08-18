@@ -1,13 +1,19 @@
 """Interfaccia a riga di comando.
 
-Tre modi d'uso:
+Quattro modi d'uso:
 
-* ``watch``      - resta in ascolto e reagisce a ogni email in arrivo (Windows);
-* ``run-once``   - esamina una sola volta i messaggi recenti (Windows, adatto
-                   anche all'Utilita' di pianificazione);
-* ``check-file`` - prova OCR e regole su un file locale, senza toccare Outlook:
-                   funziona su qualsiasi sistema operativo ed e' il modo piu'
-                   rapido per verificare chiave API e criteri.
+* ``authenticate`` - consenso una tantum all'applicazione: salva il token che
+                     servira' a tutti gli avvii successivi;
+* ``watch``        - controlla la casella ogni ``poll_interval_minutes`` e
+                     tratta i messaggi non letti appena arrivati;
+* ``run-once``     - esamina una sola volta i messaggi recenti (adatto anche a
+                     un'attivita' pianificata o a un cron);
+* ``check-file``   - prova OCR e regole su un file locale, senza toccare la
+                     casella: e' il modo piu' rapido per verificare chiave API
+                     e criteri.
+
+Tutti i comandi girano su qualsiasi sistema operativo: l'accesso alla posta
+avviene via Microsoft Graph, senza Outlook Desktop.
 """
 
 from __future__ import annotations
@@ -51,11 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
                        help="inoltra davvero i messaggi conformi")
 
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("watch", help="resta in ascolto dei nuovi messaggi (Windows)")
+    sub.add_parser("authenticate", help="autorizza l'applicazione e salva il token")
+    sub.add_parser("watch", help="controlla la posta a intervalli regolari")
 
-    run_once = sub.add_parser("run-once", help="esamina una volta i messaggi recenti (Windows)")
+    run_once = sub.add_parser("run-once", help="esamina una volta i messaggi recenti")
     run_once.add_argument("--minutes", type=int, default=None,
                           help="finestra temporale da esaminare (default: outlook.catch_up_minutes)")
+    run_once.add_argument("--include-read", action="store_true",
+                          help="esamina anche i messaggi gia' letti (default: solo i non letti)")
 
     check = sub.add_parser("check-file", help="prova OCR e criteri su un file locale")
     check.add_argument("path", type=Path, help="PDF o immagine da analizzare")
@@ -81,15 +90,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.command == "check-file":
             return _cmd_check_file(settings, args.path, args.show_text)
+        if args.command == "authenticate":
+            return _cmd_authenticate(settings)
         if args.command == "run-once":
-            return _cmd_run_once(settings, args.minutes)
+            return _cmd_run_once(settings, args.minutes, unread_only=not args.include_read)
         return _cmd_watch(settings)
     except KeyboardInterrupt:
         logger.info("Interrotto dall'utente.")
         return 130
     except OutlookError as exc:
-        # Es. esecuzione fuori da Windows o Outlook non avviato: il traceback
-        # non aggiungerebbe nulla di utile a chi usa il programma.
+        # Es. credenziali mancanti o token scaduto: il traceback non
+        # aggiungerebbe nulla di utile a chi usa il programma.
         print(f"Errore Outlook: {exc}", file=sys.stderr)
         return 3
 
@@ -126,10 +137,24 @@ def _cmd_check_file(settings: Settings, path: Path, show_text: bool) -> int:
     return 0 if report.matched else 1
 
 
-def _cmd_run_once(settings: Settings, minutes: Optional[int]) -> int:
+def _cmd_authenticate(settings: Settings) -> int:
+    """Consenso una tantum: apre l'URL di autorizzazione e salva il token."""
+    from .outlook.client import OutlookClient
+
+    client = OutlookClient(settings.outlook, settings.attachments.allowed_extensions)
+    if not client.authenticate():
+        print("Autenticazione non riuscita: nessun token salvato.", file=sys.stderr)
+        return 3
+
+    print(f"\nAutenticazione riuscita: token salvato in {settings.outlook.token_path}.")
+    print("Da ora in poi 'watch' e 'run-once' partono senza chiedere nulla.\n")
+    return 0
+
+
+def _cmd_run_once(settings: Settings, minutes: Optional[int], unread_only: bool = True) -> int:
     window = minutes if minutes is not None else settings.outlook.catch_up_minutes
     with _build_context(settings) as (client, pipeline):
-        results = pipeline.process_recent(window)
+        results = pipeline.process_recent(window, unread_only=unread_only)
 
     forwarded = sum(1 for result in results if result.forwarded)
     errors = sum(1 for result in results if result.decision is Decision.ERROR)
@@ -138,7 +163,7 @@ def _cmd_run_once(settings: Settings, minutes: Optional[int]) -> int:
 
 
 def _cmd_watch(settings: Settings) -> int:
-    from .outlook.watcher import watch  # import tardivo: richiede Windows
+    from .outlook.poller import watch
 
     with _build_context(settings) as (_client, pipeline):
         watch(settings, pipeline)
@@ -149,7 +174,7 @@ def _cmd_watch(settings: Settings) -> int:
 
 
 class _Context:
-    """Costruisce e chiude in modo ordinato client Outlook, OCR e store."""
+    """Costruisce e chiude in modo ordinato client di posta, OCR e store."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -160,7 +185,7 @@ class _Context:
         from .outlook.client import OutlookClient
 
         client = OutlookClient(
-            folder_path=self._settings.outlook.folder,
+            self._settings.outlook,
             allowed_extensions=self._settings.attachments.allowed_extensions,
         )
         client.connect()

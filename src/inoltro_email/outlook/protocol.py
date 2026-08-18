@@ -1,8 +1,8 @@
-"""Interfacce fra la pipeline e Outlook.
+"""Interfacce fra la pipeline e la casella di posta.
 
-La pipeline non conosce COM: dipende soltanto dai Protocol definiti qui. In
-produzione li implementa ``OutlookClient``; nei test un oggetto finto. Questo
-tiene la logica di business testabile su qualsiasi sistema operativo.
+La pipeline non conosce Microsoft Graph: dipende soltanto dai Protocol definiti
+qui. In produzione li implementa ``OutlookClient`` (libreria O365); nei test un
+oggetto finto. Questo tiene la logica di business collaudabile senza rete.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ class MailMessage(Protocol):
 
     @property
     def entry_id(self) -> str:
-        """Identificativo Outlook, valido finche' il messaggio resta dov'e'."""
+        """Identificativo Graph del messaggio nella casella."""
 
     @property
     def message_id(self) -> str:
@@ -40,10 +40,13 @@ class MailClient(Protocol):
     """Operazioni sulla casella richieste dalla pipeline."""
 
     def get_message(self, entry_id: str) -> Optional[MailMessage]:
-        """Recupera un messaggio dal suo EntryID (None se non piu' esistente)."""
+        """Recupera un messaggio dal suo identificativo (None se non esiste piu')."""
 
-    def recent_messages(self, minutes: int) -> List[MailMessage]:
-        """Messaggi ricevuti negli ultimi ``minutes`` minuti, dal piu' recente."""
+    def recent_messages(self, minutes: int, unread_only: bool = True) -> List[MailMessage]:
+        """Messaggi ricevuti negli ultimi ``minutes`` minuti, dal piu' recente.
+
+        Con ``unread_only`` restituisce solo quelli ancora da leggere.
+        """
 
     def save_attachments(self, message: MailMessage, dest_dir: Path) -> List[AttachmentFile]:
         """Salva gli allegati analizzabili in ``dest_dir``."""
@@ -60,3 +63,4 @@ class MailClient(Protocol):
 
     def mark_processed(self, message: MailMessage, category: str) -> None:
         """Applica una categoria al messaggio, come traccia visibile in Outlook."""
+

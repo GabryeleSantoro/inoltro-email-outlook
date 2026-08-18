@@ -3,9 +3,10 @@
 La configurazione arriva da due sorgenti distinte:
 
 * ``config.yaml``  -> parametri di funzionamento (non segreti, versionabili);
-* variabili d'ambiente / ``.env`` -> la sola chiave API di ocr.space.
+* variabili d'ambiente / ``.env`` -> i soli segreti: la chiave API di ocr.space
+  e le credenziali dell'applicazione registrata su Microsoft Entra ID.
 
-Questa separazione evita che la chiave finisca per sbaglio dentro il
+Questa separazione evita che chiavi e segreti finiscano per sbaglio dentro il
 repository insieme al file di configurazione.
 """
 
@@ -20,6 +21,15 @@ import yaml
 from dotenv import load_dotenv
 
 API_KEY_ENV = "OCR_SPACE_API_KEY"
+CLIENT_ID_ENV = "MS_CLIENT_ID"
+CLIENT_SECRET_ENV = "MS_CLIENT_SECRET"
+TENANT_ID_ENV = "MS_TENANT_ID"
+
+# Flussi di autenticazione supportati dalla libreria O365 e usati qui:
+#   authorization -> applicazione web/desktop con segreto, consenso una tantum
+#   public        -> applicazione senza segreto (client pubblico)
+#   credentials   -> solo applicazione (client credentials), senza utente
+AUTH_FLOWS = ("authorization", "public", "credentials")
 
 DEFAULT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
 
@@ -59,9 +69,31 @@ class ForwardSettings:
 
 @dataclass
 class OutlookSettings:
+    """Accesso alla casella tramite Microsoft Graph (libreria O365).
+
+    ``client_id``/``client_secret``/``tenant_id`` non si leggono dal YAML: sono
+    segreti e arrivano dall'ambiente (file ``.env``).
+    """
+
     folder: str = "Inbox"
+    # Ogni quanto interrogare la casella e quanto indietro guardare a ogni giro.
+    poll_interval_minutes: int = 5
+    lookback_minutes: int = 5
+    # Considera solo i messaggi ancora da leggere.
+    unread_only: bool = True
+    # All'avvio recupera i messaggi degli ultimi N minuti (0 per disattivare).
     catch_up_minutes: int = 30
+    max_messages_per_poll: int = 50
     processed_category: str = "Inoltrata-Televisita"
+    auth_flow: str = "authorization"
+    # Casella da leggere: obbligatoria con auth_flow "credentials" (solo
+    # applicazione), facoltativa negli altri casi (si usa quella dell'utente).
+    mailbox: str = ""
+    token_path: Path = Path("state/o365_token.txt")
+    request_timeout_seconds: int = 60
+    client_id: str = ""
+    client_secret: str = ""
+    tenant_id: str = "common"
 
 
 @dataclass
@@ -111,6 +143,9 @@ class Settings:
 
         settings = cls._from_dict(raw)
         settings.ocr.api_key = os.environ.get(API_KEY_ENV, "").strip()
+        settings.outlook.client_id = os.environ.get(CLIENT_ID_ENV, "").strip()
+        settings.outlook.client_secret = os.environ.get(CLIENT_SECRET_ENV, "").strip()
+        settings.outlook.tenant_id = os.environ.get(TENANT_ID_ENV, "").strip() or "common"
         settings.validate(require_api_key=require_api_key)
         return settings
 
@@ -156,8 +191,22 @@ class Settings:
         )
         outlook = OutlookSettings(
             folder=str(outlook_raw.get("folder", "Inbox")),
+            poll_interval_minutes=int(
+                outlook_raw.get("poll_interval_minutes", OutlookSettings.poll_interval_minutes)
+            ),
+            lookback_minutes=int(outlook_raw.get("lookback_minutes", OutlookSettings.lookback_minutes)),
+            unread_only=bool(outlook_raw.get("unread_only", OutlookSettings.unread_only)),
             catch_up_minutes=int(outlook_raw.get("catch_up_minutes", 30)),
+            max_messages_per_poll=int(
+                outlook_raw.get("max_messages_per_poll", OutlookSettings.max_messages_per_poll)
+            ),
             processed_category=str(outlook_raw.get("processed_category", "")),
+            auth_flow=str(outlook_raw.get("auth_flow", OutlookSettings.auth_flow)).lower(),
+            mailbox=str(outlook_raw.get("mailbox", "")).strip(),
+            token_path=Path(str(outlook_raw.get("token_path", OutlookSettings.token_path))),
+            request_timeout_seconds=int(
+                outlook_raw.get("request_timeout_seconds", OutlookSettings.request_timeout_seconds)
+            ),
         )
         attachments = AttachmentSettings(
             allowed_extensions=[
@@ -205,10 +254,26 @@ class Settings:
                 raise ConfigError(f"Indirizzo di inoltro non valido: {address!r}")
         if self.attachments.max_bytes < 1:
             raise ConfigError("attachments.max_bytes deve essere > 0.")
+        if self.outlook.auth_flow not in AUTH_FLOWS:
+            raise ConfigError(
+                "outlook.auth_flow deve valere " + " oppure ".join(repr(f) for f in AUTH_FLOWS) + "."
+            )
+        if self.outlook.auth_flow == "credentials" and not self.outlook.mailbox:
+            raise ConfigError(
+                "Con outlook.auth_flow: credentials serve outlook.mailbox, "
+                "l'indirizzo della casella da leggere (non c'e' un utente connesso)."
+            )
+        if self.outlook.poll_interval_minutes < 1:
+            raise ConfigError("outlook.poll_interval_minutes deve essere >= 1.")
+        if self.outlook.lookback_minutes < 1:
+            raise ConfigError("outlook.lookback_minutes deve essere >= 1.")
+        if self.outlook.max_messages_per_poll < 1:
+            raise ConfigError("outlook.max_messages_per_poll deve essere >= 1.")
 
     def ensure_directories(self) -> None:
-        """Crea le cartelle di stato e di log, cosi' il primo avvio non fallisce."""
+        """Crea le cartelle di stato, del token e di log: il primo avvio non fallisce."""
         self.storage.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.outlook.token_path.parent.mkdir(parents=True, exist_ok=True)
         if self.logging.file:
             self.logging.file.parent.mkdir(parents=True, exist_ok=True)
 
