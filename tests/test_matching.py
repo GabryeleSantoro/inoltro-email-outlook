@@ -71,4 +71,4 @@ def test_report_elenca_trovati_e_mancanti() -> None:
 
 def test_normalizzazione() -> None:
     assert normalize("  TELEVISITÀ   à\tpiù ") == "televisita a piu"
-    assert alnum_collapse("15 - A / 10") == "15a10"
+    assert alnum_collapse("15 - 0 / 10") == "15010"

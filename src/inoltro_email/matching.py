@@ -37,7 +37,7 @@ def normalize(text: str) -> str:
 def alnum_collapse(text: str) -> str:
     """Tiene solo lettere e cifre.
 
-    Serve a rendere equivalenti "15A10", "15 A 10", "15-A10" e "TELE VISITA"
+    Serve a rendere equivalenti "1501A", "15 0 1A", "15-01A" e "TELE VISITA"
     spezzata da un a capo.
     """
     return _NON_ALNUM.sub("", normalize(text))

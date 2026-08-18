@@ -43,7 +43,7 @@ class OcrSettings:
 @dataclass
 class RuleSettings:
     keywords: List[str] = field(default_factory=lambda: ["televisita"])
-    codes: List[str] = field(default_factory=lambda: ["15A10"])
+    codes: List[str] = field(default_factory=lambda: ["1501A"])
     mode: str = "all"
     fuzzy_ocr_confusions: bool = True
 

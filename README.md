@@ -3,7 +3,7 @@
 Inoltro automatico di email tramite **Outlook Desktop**: quando arriva un messaggio,
 il programma ne legge gli allegati (PDF e immagini) con l'OCR di
 [ocr.space](https://ocr.space/ocrapi) e, se il testo contiene **sia la parola
-"televisita" sia il codice "15A10"**, inoltra il messaggio ai destinatari
+"televisita" sia il codice "1501A"**, inoltra il messaggio ai destinatari
 configurati.
 
 ## Come funziona
@@ -21,7 +21,7 @@ Outlook (evento NewMailEx)
   ocr.space (POST /parse/image)
         |
         v
-  criteri: "televisita" AND "15A10"
+  criteri: "televisita" AND "1501A"
         |
         v
   Outlook: Forward() -> destinatari  +  categoria "Inoltrata-Televisita"
@@ -37,8 +37,8 @@ Alcune scelte di funzionamento:
 - **Niente doppi inoltri**: ogni messaggio elaborato viene registrato in un
   database SQLite usando l'Internet Message-ID, cosi' l'evento e la scansione di
   recupero all'avvio non possono inoltrare due volte lo stesso messaggio.
-- **Tolleranza al rumore dell'OCR**: `15 A 10`, `15-A10` e `l5A1O` vengono
-  riconosciuti come `15A10`; `tele visita` spezzata da un a capo come
+- **Tolleranza al rumore dell'OCR**: `15 0 10`, `15-010` e `15010` vengono
+  riconosciuti come `1501A`; `tele visita` spezzata da un a capo come
   `televisita`.
 - **Predefinito prudente**: `forward.dry_run: true`, quindi al primo avvio il
   programma mostra cosa *avrebbe* inoltrato senza inviare nulla.
@@ -104,7 +104,7 @@ python -m inoltro_email check-file C:\percorso\referto.pdf --show-text
 File      : C:\percorso\referto.pdf
 Sorgente  : pdf_text
 Caratteri : 512
-Criteri   : trovati=[televisita, 15A10] mancanti=[-]
+Criteri   : trovati=[televisita, 1501A] mancanti=[-]
 Esito     : CONFORME - la mail verrebbe inoltrata
 ```
 
@@ -134,7 +134,7 @@ raggiungibile, `130` interruzione da tastiera.
 src/inoltro_email/
 ├── __main__.py        riga di comando (watch | run-once | check-file)
 ├── config.py          lettura e validazione di config.yaml + .env
-├── matching.py        normalizzazione del testo e regole televisita/15A10
+├── matching.py        normalizzazione del testo e regole televisita/1501A
 ├── pipeline.py        orchestrazione: allegati -> testo -> criteri -> inoltro
 ├── state.py           registro SQLite anti-duplicato
 ├── models.py          strutture dati condivise

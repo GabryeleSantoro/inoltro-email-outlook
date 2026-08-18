@@ -21,7 +21,7 @@ rules:
     - "televisita"
   # Codici: confronto tollerante a spazi e separatori (15 A 10, 15-A10, ...).
   codes:
-    - "15A10"
+    - "1501A"
   # all = servono TUTTE le keyword E TUTTI i codici (AND)
   # any = ne basta uno qualsiasi (OR)
   mode: "all"
@@ -33,7 +33,7 @@ forward:
   to:
     - "destinatario@example.com"
   cc: []
-  subject_prefix: "[TELEVISITA 15A10] "
+  subject_prefix: "[TELEVISITA 1501A] "
   body_note: "Inoltro automatico: l'allegato soddisfa i criteri configurati."
   # true = simula soltanto, non invia nulla. Metterlo a false per inoltrare davvero.
   dry_run: true
@@ -49,7 +49,8 @@ outlook:
   processed_category: "Inoltrata-Televisita"
 
 attachments:
-  allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
+  allowed_extensions:
+    [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
   # Allegati piu' grandi di questo vengono ignorati (byte).
   max_bytes: 10485760
 
