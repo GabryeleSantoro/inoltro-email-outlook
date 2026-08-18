@@ -1,8 +1,9 @@
-"""Integrazione con Outlook Desktop tramite COM (solo Windows).
+"""Integrazione con la casella Outlook tramite Microsoft Graph (libreria O365).
 
-I moduli ``protocol`` e ``client`` sono importabili anche fuori da Windows:
-``win32com`` viene importato solo al momento della connessione, cosi' i test
-della pipeline girano ovunque usando un client fittizio.
+Non serve Outlook Desktop: il programma parla con Microsoft 365 via HTTPS e
+funziona su qualsiasi sistema operativo. ``protocol`` descrive cio' che la
+pipeline si aspetta, ``client`` lo realizza e ``poller`` esegue il controllo
+periodico della posta in arrivo.
 """
 
 from .protocol import MailClient, MailMessage

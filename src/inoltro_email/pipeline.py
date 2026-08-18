@@ -5,9 +5,9 @@ Il flusso, per ogni messaggio:
     prenota (anti-duplicato) -> salva allegati -> estrai testo -> confronta
     con le regole -> inoltra (o simula) -> registra l'esito
 
-Questo modulo non importa nulla di specifico per Windows: dipende solo dai
-Protocol di ``outlook.protocol``, quindi e' interamente testabile con un client
-fittizio su qualunque sistema operativo.
+Questo modulo non conosce Microsoft Graph: dipende solo dai Protocol di
+``outlook.protocol``, quindi e' interamente collaudabile con un client fittizio
+e senza rete.
 """
 
 from __future__ import annotations
@@ -45,16 +45,16 @@ class ForwardPipeline:
     # ------------------------------------------------------------- ingressi
 
     def process_entry_id(self, entry_id: str) -> Optional[ProcessResult]:
-        """Elabora il messaggio indicato dall'evento ``NewMailEx``."""
+        """Elabora un singolo messaggio indicato dal suo identificativo."""
         message = self._mail.get_message(entry_id)
         if message is None:
             return None
         return self.process_message(message)
 
-    def process_recent(self, minutes: int) -> List[ProcessResult]:
-        """Rilegge i messaggi recenti (recupero all'avvio o esecuzione singola)."""
+    def process_recent(self, minutes: int, unread_only: bool = True) -> List[ProcessResult]:
+        """Elabora i messaggi recenti (un giro di controllo o l'esecuzione singola)."""
         results: List[ProcessResult] = []
-        for message in self._mail.recent_messages(minutes):
+        for message in self._mail.recent_messages(minutes, unread_only=unread_only):
             result = self.process_message(message)
             if result is not None:
                 results.append(result)
@@ -167,7 +167,7 @@ def message_key(message: MailMessage) -> str:
 
     Si preferisce l'Internet Message-ID perche' resta valido anche se il
     messaggio viene spostato di cartella o se il programma viene riavviato;
-    l'EntryID e' il ripiego quando la proprieta' non e' disponibile.
+    l'identificativo Graph e' il ripiego quando non e' disponibile.
     """
     return (message.message_id or "").strip() or f"entryid:{message.entry_id}"
 

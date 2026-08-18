@@ -1,7 +1,7 @@
 """Registro dei messaggi gia' elaborati (SQLite).
 
-Serve a non inoltrare due volte la stessa email: l'evento ``NewMailEx`` e la
-scansione di recupero all'avvio possono benissimo vedere lo stesso messaggio.
+Serve a non inoltrare due volte la stessa email: due controlli consecutivi
+hanno finestre che si sovrappongono e vedono facilmente lo stesso messaggio.
 L'inserimento con ``INSERT OR IGNORE`` funziona da lock: se non inserisce
 nulla, qualcuno l'ha gia' preso in carico.
 """

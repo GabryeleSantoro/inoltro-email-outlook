@@ -1,6 +1,7 @@
 # Configurazione di inoltro-email-outlook
-# Copiare in `config.yaml` e adattare. La chiave API di ocr.space NON va qui:
-# va messa nella variabile d'ambiente OCR_SPACE_API_KEY (file .env).
+# Copiare in `config.yaml` e adattare. I segreti NON vanno qui: la chiave di
+# ocr.space e le credenziali dell'applicazione Microsoft stanno nel file .env
+# (OCR_SPACE_API_KEY, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID).
 
 ocr:
   endpoint: "https://api.ocr.space/parse/image"
@@ -39,14 +40,33 @@ forward:
   dry_run: true
 
 outlook:
-  # Cartella da sorvegliare. "Inbox" = Posta in arrivo dell'account predefinito.
+  # Cartella da sorvegliare. "Inbox" = Posta in arrivo.
   # Per una sottocartella usare il percorso: "Inbox/Televisite"
   folder: "Inbox"
-  # All'avvio rilegge i messaggi degli ultimi N minuti (recupera cio' che e'
-  # arrivato mentre il programma era spento). 0 per disattivare.
+  # Ogni quanto interrogare la casella (minuti).
+  poll_interval_minutes: 5
+  # Quanto indietro guardare a ogni controllo (minuti): tenerlo >= all'intervallo.
+  lookback_minutes: 5
+  # true = si esaminano solo i messaggi ancora da leggere.
+  unread_only: true
+  # Al primo controllo dopo l'avvio guarda indietro di N minuti (recupera cio'
+  # che e' arrivato mentre il programma era spento). 0 per disattivare.
   catch_up_minutes: 30
+  # Quanti messaggi al massimo scaricare per ogni controllo.
+  max_messages_per_poll: 50
   # Categoria Outlook applicata ai messaggi inoltrati (vuoto per disattivare).
   processed_category: "Inoltrata-Televisita"
+  # Come ci si autentica sull'applicazione registrata su Microsoft Entra ID:
+  #   authorization -> a nome dell'utente, con segreto client (consigliato)
+  #   public        -> a nome dell'utente, applicazione senza segreto
+  #   credentials   -> solo applicazione, senza utente (richiede 'mailbox')
+  auth_flow: "authorization"
+  # Casella da leggere: obbligatoria con auth_flow "credentials", altrimenti si
+  # usa quella dell'utente che ha dato il consenso.
+  mailbox: ""
+  # Dove viene conservato il token (contiene il refresh token: non versionarlo).
+  token_path: "state/o365_token.txt"
+  request_timeout_seconds: 60
 
 attachments:
   allowed_extensions:

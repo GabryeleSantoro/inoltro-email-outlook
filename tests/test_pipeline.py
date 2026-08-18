@@ -90,7 +90,7 @@ def test_messaggio_senza_allegati_saltato(settings, store) -> None:
 
 
 def test_nessun_doppio_inoltro_dello_stesso_messaggio(settings, store) -> None:
-    """L'evento NewMailEx e la scansione di recupero possono sovrapporsi."""
+    """Le finestre di due controlli consecutivi si sovrappongono di proposito."""
     message = FakeMessage(attachments={"referto.pdf": make_blank_pdf()})
     mail = FakeMailClient([message])
     ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
@@ -209,3 +209,18 @@ def test_process_recent_elabora_tutti_i_messaggi(settings, store) -> None:
         Decision.FORWARDED, Decision.NO_MATCH, Decision.SKIPPED_NO_ATTACHMENT
     ]
     assert len(mail.forwarded) == 1
+
+
+def test_process_recent_chiede_solo_i_non_letti(settings, store) -> None:
+    """Il filtro sui messaggi da leggere viene girato al client di posta."""
+    letto = FakeMessage(subject="Gia' letto", message_id="<a@x>", entry_id="E1",
+                        attachments={"ok.pdf": make_blank_pdf()}, is_read=True)
+    non_letto = FakeMessage(subject="Nuovo", message_id="<b@x>", entry_id="E2",
+                            attachments={"ok.pdf": make_blank_pdf()})
+    mail = FakeMailClient([letto, non_letto])
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
+
+    results = build_pipeline(settings, mail, ocr, store).process_recent(5)
+
+    assert mail.queries == [{"minutes": 5, "unread_only": True}]
+    assert [r.subject for r in results] == ["Nuovo"]

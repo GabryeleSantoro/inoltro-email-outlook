@@ -1,4 +1,4 @@
-"""Fixture condivise: configurazione di prova, client Outlook e OCR fittizi."""
+"""Fixture condivise: configurazione di prova, client di posta e OCR fittizi."""
 
 from __future__ import annotations
 
@@ -41,7 +41,15 @@ def settings(tmp_path: Path) -> Settings:
             body_note="Inoltro automatico.",
             dry_run=False,
         ),
-        outlook=OutlookSettings(catch_up_minutes=30, processed_category="Inoltrata"),
+        outlook=OutlookSettings(
+            catch_up_minutes=30,
+            poll_interval_minutes=5,
+            lookback_minutes=5,
+            processed_category="Inoltrata",
+            client_id="id-di-prova",
+            client_secret="segreto-di-prova",
+            token_path=tmp_path / "o365_token.txt",
+        ),
         attachments=AttachmentSettings(max_bytes=10_485_760),
         storage=StorageSettings(db_path=tmp_path / "state.sqlite3"),
         logging=LoggingSettings(level="DEBUG", file=None),
@@ -75,12 +83,14 @@ class FakeMessage:
         entry_id: str = "ENTRY1",
         attachments: Optional[Dict[str, bytes]] = None,
         sender: str = "mittente@example.com",
+        is_read: bool = False,
     ) -> None:
         self.subject = subject
         self.message_id = message_id
         self.entry_id = entry_id
         self.sender = sender
         self.attachments = attachments or {}
+        self.is_read = is_read
 
     @property
     def has_attachments(self) -> bool:
@@ -88,17 +98,21 @@ class FakeMessage:
 
 
 class FakeMailClient:
-    """Client Outlook finto: registra inoltri e categorie applicate."""
+    """Client di posta finto: registra interrogazioni, inoltri e categorie."""
 
     def __init__(self, messages: Optional[List[FakeMessage]] = None) -> None:
         self.messages = messages or []
         self.forwarded: List[Dict[str, object]] = []
         self.categories: List[str] = []
+        self.queries: List[Dict[str, object]] = []
 
     def get_message(self, entry_id: str) -> Optional[FakeMessage]:
         return next((m for m in self.messages if m.entry_id == entry_id), None)
 
-    def recent_messages(self, minutes: int) -> List[FakeMessage]:
+    def recent_messages(self, minutes: int, unread_only: bool = True) -> List[FakeMessage]:
+        self.queries.append({"minutes": minutes, "unread_only": unread_only})
+        if unread_only:
+            return [message for message in self.messages if not message.is_read]
         return list(self.messages)
 
     def save_attachments(self, message: FakeMessage, dest_dir: Path) -> List[AttachmentFile]:

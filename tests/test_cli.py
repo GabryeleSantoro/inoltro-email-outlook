@@ -1,7 +1,7 @@
 """Test della riga di comando, in particolare del comando `check-file`.
 
-`check-file` e' l'unico comando che gira anche fuori da Windows: e' il modo
-previsto per verificare chiave API e criteri senza toccare Outlook.
+`check-file` e' l'unico comando che non tocca la casella: e' il modo previsto
+per verificare chiave API e criteri senza collegarsi a Microsoft 365.
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ rules:
 forward:
   to: ["destinatario@example.com"]
   dry_run: true
+outlook:
+  token_path: "{token}"
 storage:
   db_path: "{db}"
 logging:
@@ -39,7 +41,13 @@ logging:
 def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave-di-prova")
     path = tmp_path / "config.yaml"
-    path.write_text(CONFIG.format(db=(tmp_path / "state.sqlite3").as_posix()), encoding="utf-8")
+    path.write_text(
+        CONFIG.format(
+            db=(tmp_path / "state.sqlite3").as_posix(),
+            token=(tmp_path / "o365_token.txt").as_posix(),
+        ),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -97,8 +105,9 @@ def test_no_dry_run_sovrascrive_la_configurazione(config_file: Path, tmp_path: P
     """Il flag della CLI deve avere la precedenza sul file YAML."""
     visto = {}
 
-    def finto_run_once(settings, minutes):
+    def finto_run_once(settings, minutes, unread_only=True):
         visto["dry_run"] = settings.forward.dry_run
+        visto["unread_only"] = unread_only
         return 0
 
     monkeypatch.setattr("inoltro_email.__main__._cmd_run_once", finto_run_once)
@@ -110,16 +119,52 @@ def test_no_dry_run_sovrascrive_la_configurazione(config_file: Path, tmp_path: P
     assert visto["dry_run"] is True  # resta quello del file
 
 
-def test_outlook_non_disponibile_senza_traceback(config_file: Path, capsys,
-                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fuori da Windows 'watch' deve spiegarsi, non stampare un traceback."""
+def test_include_read_disattiva_il_filtro_sui_non_letti(config_file: Path,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    visto = {}
+
+    def finto_run_once(settings, minutes, unread_only=True):
+        visto["unread_only"] = unread_only
+        return 0
+
+    monkeypatch.setattr("inoltro_email.__main__._cmd_run_once", finto_run_once)
+    main(["--config", str(config_file), "run-once"])
+    assert visto["unread_only"] is True
+
+    main(["--config", str(config_file), "run-once", "--include-read"])
+    assert visto["unread_only"] is False
+
+
+def test_casella_non_raggiungibile_senza_traceback(config_file: Path, capsys,
+                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """Senza token valido 'watch' deve spiegarsi, non stampare un traceback."""
     from inoltro_email.outlook.client import OutlookError
 
     def connessione_fallita(self):
-        raise OutlookError("pywin32 non disponibile")
+        raise OutlookError("Nessun token valido")
 
     monkeypatch.setattr("inoltro_email.outlook.client.OutlookClient.connect", connessione_fallita)
     code = main(["--config", str(config_file), "watch"])
 
     assert code == 3
     assert "Errore Outlook" in capsys.readouterr().err
+
+
+def test_authenticate_riporta_il_token_salvato(config_file: Path, capsys,
+                                               monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("inoltro_email.outlook.client.OutlookClient.authenticate",
+                        lambda self: True)
+    code = main(["--config", str(config_file), "authenticate"])
+
+    assert code == 0
+    assert "Autenticazione riuscita" in capsys.readouterr().out
+
+
+def test_authenticate_fallita_restituisce_errore(config_file: Path, capsys,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("inoltro_email.outlook.client.OutlookClient.authenticate",
+                        lambda self: False)
+    code = main(["--config", str(config_file), "authenticate"])
+
+    assert code == 3
+    assert "non riuscita" in capsys.readouterr().err

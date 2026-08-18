@@ -99,10 +99,72 @@ def test_config_di_esempio_e_valido(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.forward.dry_run is True  # default prudente
 
 
+def test_auth_flow_sconosciuto(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + "outlook:\n  auth_flow: magico\n"
+    with pytest.raises(ConfigError, match="outlook.auth_flow"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+
+def test_flusso_applicativo_richiede_la_casella(tmp_path: Path,
+                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    """Senza utente connesso non si sa quale casella leggere."""
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + "outlook:\n  auth_flow: credentials\n"
+    with pytest.raises(ConfigError, match="outlook.mailbox"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+    yaml_text += '  mailbox: "casella@example.com"\n'
+    settings = Settings.load(write_config(tmp_path, yaml_text))
+    assert settings.outlook.mailbox == "casella@example.com"
+
+
+def test_intervallo_di_controllo_non_valido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + "outlook:\n  poll_interval_minutes: 0\n"
+    with pytest.raises(ConfigError, match="poll_interval_minutes"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+
+def test_credenziali_microsoft_dall_ambiente(tmp_path: Path,
+                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    """Client id, segreto e tenant non stanno nel YAML ma nell'ambiente."""
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    monkeypatch.setenv("MS_CLIENT_ID", "id-applicazione")
+    monkeypatch.setenv("MS_CLIENT_SECRET", "segreto")
+    monkeypatch.setenv("MS_TENANT_ID", "contoso.onmicrosoft.com")
+
+    settings = Settings.load(write_config(tmp_path, VALID_YAML))
+
+    assert settings.outlook.client_id == "id-applicazione"
+    assert settings.outlook.client_secret == "segreto"
+    assert settings.outlook.tenant_id == "contoso.onmicrosoft.com"
+
+
+def test_tenant_predefinito(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    monkeypatch.delenv("MS_TENANT_ID", raising=False)
+    monkeypatch.setattr("inoltro_email.config.load_dotenv", lambda *a, **k: None)
+
+    assert Settings.load(write_config(tmp_path, VALID_YAML)).outlook.tenant_id == "common"
+
+
+def test_valori_di_controllo_predefiniti(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Senza sezione 'outlook' si controlla la posta ogni 5 minuti, solo non letti."""
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    settings = Settings.load(write_config(tmp_path, VALID_YAML))
+
+    assert settings.outlook.poll_interval_minutes == 5
+    assert settings.outlook.lookback_minutes == 5
+    assert settings.outlook.unread_only is True
+
+
 def test_ensure_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
     settings = Settings.load(write_config(tmp_path, VALID_YAML))
     settings.storage.db_path = tmp_path / "dati" / "db.sqlite3"
     settings.logging.file = tmp_path / "registri" / "app.log"
+    settings.outlook.token_path = tmp_path / "credenziali" / "o365_token.txt"
     settings.ensure_directories()
     assert (tmp_path / "dati").is_dir() and (tmp_path / "registri").is_dir()
+    assert (tmp_path / "credenziali").is_dir()
