@@ -67,7 +67,7 @@ def test_check_file_su_pdf_non_conforme(config_file: Path, tmp_path: Path, capsy
 @responses.activate
 def test_check_file_su_immagine_usa_ocr(config_file: Path, tmp_path: Path, capsys) -> None:
     responses.add(responses.POST, ENDPOINT, status=200, json={
-        "ParsedResults": [{"ParsedText": "TELEVISITA cod. 15 A 10", "FileParseExitCode": 1}],
+        "ParsedResults": [{"ParsedText": "TELEVISITA cod. 15 0 1A", "FileParseExitCode": 1}],
         "OCRExitCode": 1, "IsErroredOnProcessing": False,
     })
     image = tmp_path / "foto.png"
@@ -77,7 +77,7 @@ def test_check_file_su_immagine_usa_ocr(config_file: Path, tmp_path: Path, capsy
 
     out = capsys.readouterr().out
     assert code == 0
-    assert "CONFORME" in out and "TELEVISITA cod. 15 A 10" in out
+    assert "CONFORME" in out and "TELEVISITA cod. 15 0 1A" in out
 
 
 def test_check_file_su_percorso_inesistente(config_file: Path, tmp_path: Path, capsys) -> None:

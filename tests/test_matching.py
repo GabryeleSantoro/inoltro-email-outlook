@@ -12,8 +12,8 @@ from inoltro_email.matching import alnum_collapse, evaluate, normalize
     "text",
     [
         "Richiesta di TELEVISITA - codice 1501A",
-        "richiesta di televisita codice 15 A 10",
-        "TELEVISITA\nprestazione 15-A10",
+        "richiesta di televisita codice 15 0 1A",
+        "TELEVISITA\nprestazione 15-01A",
         "Prestazione: 1501A  Tipo: Tele visita cardiologica",
         "codice1501A televisita",
         "TELEVISITÀ e codice 1501A",  # accento: normalizzato
@@ -40,12 +40,12 @@ def test_in_and_serve_tutto(text: str) -> None:
 
 def test_confusioni_ocr_attive_per_default() -> None:
     # L'OCR legge spesso "1" come "l" e "0" come "O".
-    assert evaluate("televisita prestazione l5A1O", RuleSettings()).matched
+    assert evaluate("televisita prestazione l5O1A", RuleSettings()).matched
 
 
 def test_confusioni_ocr_disattivabili() -> None:
     rules = RuleSettings(fuzzy_ocr_confusions=False)
-    assert not evaluate("televisita prestazione l5A1O", rules).matched
+    assert not evaluate("televisita prestazione l5O1A", rules).matched
     # Il codice scritto correttamente continua a essere riconosciuto.
     assert evaluate("televisita prestazione 1501A", rules).matched
 
