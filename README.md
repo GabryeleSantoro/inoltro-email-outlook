@@ -1,67 +1,72 @@
 # inoltro-email-outlook
 
-Inoltro automatico di email da una casella **Microsoft 365 / Outlook.com**: ogni
-cinque minuti il programma cerca i messaggi **non letti arrivati negli ultimi
-cinque minuti**, ne legge gli allegati (PDF e immagini) con l'OCR di
-[ocr.space](https://ocr.space/ocrapi) e, se il testo contiene **sia la parola
-"televisita" sia il codice "1501A"**, inoltra il messaggio ai destinatari
-configurati.
+Servizio **HTTP** che analizza una email per volta, inviata da un flusso
+**Power Automate**. Per ogni messaggio ricevuto il servizio:
 
-L'accesso alla posta avviene via **Microsoft Graph** con la libreria
-[O365](https://github.com/O365/python-o365): **non serve Outlook installato**,
-ne' Windows. Il programma gira anche su Linux, su macOS o dentro un container.
+1. verifica che **oggetto o corpo** parlino di **telemedicina** o **televisita**;
+2. legge **allegati e foto incorporate nel corpo** con l'OCR di
+   [ocr.space](https://ocr.space/ocrapi) e controlla che il testo contenga
+   **sia "telemedicina" sia il codice "1501A"**;
+3. calcola un **punteggio di sentiment** del messaggio e un punteggio di
+   **intento di prenotazione** (quanto somiglia alla richiesta di prenotare una
+   telemedicina).
+
+La risposta e' un JSON che il flusso Power Automate puo' usare per decidere cosa
+fare: inoltrare, aprire una pratica, rispondere al paziente o ignorare. Il
+servizio non tocca la casella di posta e non invia nulla: legge, valuta e
+risponde.
 
 ## Come funziona
 
 ```
-ogni 5 minuti: Microsoft Graph
-  messaggi non letti degli ultimi 5 minuti
-        |
-        v
-  allegati scaricati in una cartella temporanea
-        |
-        v
-  PDF con testo? --si--> pypdf legge il testo (nessuna chiamata OCR)
-        |no
-        v
-  ocr.space (POST /parse/image)
-        |
-        v
-  criteri: "televisita" AND "1501A"
-        |
-        v
-  Graph: inoltro -> destinatari  +  categoria "Inoltrata-Televisita"
+Power Automate (nuova email)  --POST /analizza-email-->  servizio
+                                                            |
+                                            oggetto + corpo: telemedicina/televisita?
+                                                            |
+                                      no <-----------------/ \-----------------> si
+                                       |                                          |
+                            esito "scartata"                    allegati e foto del corpo
+                            (nessuna chiamata OCR)                        |
+                                                          PDF con testo? --si--> pypdf (niente OCR)
+                                                                  |no
+                                                                  v
+                                                          ocr.space (POST /parse/image)
+                                                                  |
+                                                    criteri: "telemedicina" AND "1501A"
+                                                                  |
+                                                     esito "conforme" / "non_conforme"
+                                                                  |
+                                             + sentiment  + punteggio di prenotazione
+                                                                  |
+                                                              risposta JSON
 ```
 
 Alcune scelte di funzionamento:
 
-- **Selezione fatta dal servizio**: la finestra temporale e il filtro sui
-  messaggi da leggere sono un `$filter` di Graph, quindi a ogni giro si scarica
-  solo il poco che serve, non l'intera Posta in arrivo.
-- **Nessun buco fra un controllo e l'altro**: i giri partono a intervalli fissi
-  e, se uno dura piu' del previsto, la finestra del successivo si allarga al
-  tempo realmente trascorso.
+- **Screening prima dell'OCR**: se oggetto e corpo non parlano di telemedicina
+  non si spende nemmeno una chiamata all'API (`screening.stop_on_failure`).
 - **Risparmio di quota OCR**: se un PDF ha gia' il livello di testo lo si legge
-  con `pypdf`, senza chiamare l'API; e non appena un allegato soddisfa i criteri
-  gli altri non vengono piu' analizzati.
-- **Niente doppi inoltri**: ogni messaggio elaborato viene registrato in un
-  database SQLite usando l'Internet Message-ID, cosi' le finestre sovrapposte di
-  due controlli consecutivi non possono inoltrare due volte lo stesso messaggio.
-- **Tolleranza al rumore dell'OCR**: `15 0 10`, `15-010` e `15010` vengono
-  riconosciuti come `1501A`; `tele visita` spezzata da un a capo come
-  `televisita`.
-- **Predefinito prudente**: `forward.dry_run: true`, quindi al primo avvio il
-  programma mostra cosa *avrebbe* inoltrato senza inviare nulla.
+  con `pypdf`, senza uscire dalla macchina; e non appena un documento soddisfa i
+  criteri gli altri non vengono piu' analizzati.
+- **Le foto del corpo contano**: spesso l'impegnativa e' fotografata e incollata
+  nel messaggio. Vengono riconosciute sia come allegati `isInline`, sia come
+  immagini `<img src="data:image/...;base64,...">` dentro l'HTML.
+- **Tolleranza al rumore dell'OCR**: `15 0 1A`, `15-01A` e `l5O1A` vengono
+  riconosciuti come `1501A`; `tele medicina` spezzata da un a capo come
+  `telemedicina`.
+- **Risposta sempre interpretabile**: un allegato illeggibile o un errore
+  dell'OCR non fanno fallire la chiamata, diventano un esito con il motivo
+  scritto nel JSON.
+- **Sentiment spiegabile**: il punteggio e' calcolato con un lessico italiano e
+  la risposta riporta i termini e gli indizi che lo hanno determinato. Nessun
+  modello da scaricare, nessuna chiamata di rete aggiuntiva.
 
 ## Requisiti
 
-- **Python 3.9+** su qualsiasi sistema operativo (Windows, Linux, macOS).
-- Una casella **Microsoft 365 / Outlook.com** e un'**applicazione registrata**
-  su [Microsoft Entra ID](https://entra.microsoft.com) (vedi sotto).
+- **Python 3.11+** su qualsiasi sistema operativo.
 - Una chiave API di [ocr.space](https://ocr.space/ocrapi) (il piano gratuito e'
   sufficiente per volumi contenuti).
-
-Non servono Outlook Desktop ne' `pywin32`.
+- Un flusso **Power Automate** che sappia raggiungere il servizio via HTTPS.
 
 ## Installazione
 
@@ -75,39 +80,21 @@ source .venv/bin/activate       # su Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Registrazione dell'applicazione
-
-Una volta sola, su <https://entra.microsoft.com> -> **Registrazioni per l'app**
--> **Nuova registrazione**:
-
-1. tipo di account: quello della propria casella (solo l'organizzazione, oppure
-   anche gli account Microsoft personali);
-2. **URI di reindirizzamento**: tipo *Web*, valore
-   `https://login.microsoftonline.com/common/oauth2/nativeclient`;
-3. in **Certificati e segreti** creare un **nuovo segreto client** e copiarne
-   subito il valore (non sara' piu' visibile);
-4. in **Autorizzazioni API** -> *Microsoft Graph* -> **Autorizzazioni
-   delegate** aggiungere `Mail.ReadWrite` e `Mail.Send`.
-
-Client id, segreto e tenant vanno nel file `.env` (vedi sotto). Chi preferisce
-far girare il programma senza utente collegato (per esempio su un server) puo'
-usare `outlook.auth_flow: credentials` con le corrispondenti **autorizzazioni
-applicazione** e indicare la casella in `outlook.mailbox`.
-
 ## Configurazione
 
-Servono due file, entrambi esclusi dal versionamento:
-
-**1. `.env`** — i segreti (copiare da `.env.example`):
+**1. `.env`** — i segreti (copiare da `.env.example`, escluso dal versionamento):
 
 ```
 OCR_SPACE_API_KEY=la-tua-chiave
-MS_CLIENT_ID=id-applicazione-client
-MS_CLIENT_SECRET=segreto-client
-MS_TENANT_ID=common
+SERVICE_API_KEY=una-stringa-lunga-e-casuale
 ```
 
-**2. `config.yaml`** — i parametri (copiare da `config.example.yaml`):
+`SERVICE_API_KEY` e' la chiave che Power Automate deve inviare nell'header
+`X-API-Key`. Se resta vuota il controllo e' disattivato: accettabile solo in
+locale.
+
+**2. `config.yaml`** — i parametri (facoltativo: senza il file valgono i valori
+predefiniti). Copiarlo da `config.example.yaml`:
 
 ```bash
 cp config.example.yaml config.yaml
@@ -118,87 +105,218 @@ Le voci da rivedere subito:
 
 | Voce | Significato |
 |---|---|
-| `forward.to` | destinatari dell'inoltro (obbligatorio) |
-| `forward.dry_run` | `true` = simula soltanto. Mettere `false` per inviare davvero |
-| `rules.keywords` / `rules.codes` | i termini cercati; con `mode: all` servono tutti |
-| `outlook.folder` | cartella sorvegliata (`Inbox`, oppure `Inbox/Televisite`) |
-| `outlook.poll_interval_minutes` | ogni quanto controllare la posta (default 5) |
-| `outlook.lookback_minutes` | quanto indietro guardare a ogni controllo (default 5) |
-| `outlook.unread_only` | `true` = solo i messaggi ancora da leggere |
-| `outlook.catch_up_minutes` | al primo controllo dopo l'avvio guarda indietro di N minuti |
-| `outlook.auth_flow` / `outlook.mailbox` | come ci si autentica e quale casella si legge |
+| `screening.keywords` / `screening.mode` | termini cercati in oggetto e corpo (`any` = ne basta uno) |
+| `screening.stop_on_failure` | `true` = niente OCR se lo screening non passa |
+| `rules.keywords` / `rules.codes` | criteri sul testo dei documenti; con `mode: all` servono tutti |
+| `attachments.include_inline_images` | analizza anche le foto incorporate nel corpo |
+| `attachments.max_files` | quanti file al massimo passare all'OCR per email |
+| `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" |
+| `api.host` / `api.port` | dove ascolta il servizio (le variabili `API_HOST` e `PORT` hanno la precedenza) |
 | `ocr.max_file_bytes` / `ocr.max_pdf_pages_per_request` | limiti del piano ocr.space |
 
-## Uso
-
-**Autorizzare l'applicazione** (una volta sola: apre un URL da incollare nel
-browser e salva il token, con il suo refresh token, in `state/o365_token.txt`):
+## Avvio del servizio
 
 ```bash
-python -m inoltro_email authenticate
+python -m inoltro_email serve                    # oppure: python main.py
+python -m inoltro_email serve --port 9000 --reload
 ```
 
-**Provare i criteri su un file, senza toccare la casella** (e' il modo piu'
-rapido per verificare chiave API e regole):
+In produzione si puo' usare direttamente uvicorn con piu' processi:
 
 ```bash
-python -m inoltro_email check-file referto.pdf --show-text
+uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 4
+```
+
+Documentazione interattiva (generata dal servizio): <http://localhost:8000/docs>.
+
+## L'API
+
+| Metodo | Percorso | Descrizione |
+|---|---|---|
+| `POST` | `/analizza-email` | analizza una singola email (richiede `X-API-Key` se configurata) |
+| `GET` | `/salute` | sonda di funzionamento, sempre pubblica |
+| `GET` | `/` | informazioni sul servizio |
+| `GET` | `/docs`, `/openapi.json` | documentazione e schema OpenAPI |
+
+### Richiesta
+
+Il corpo e' il messaggio cosi' come lo consegna Power Automate. Sono accettate
+sia la forma del connettore *Office 365 Outlook* sia quella di *Microsoft
+Graph*, e le chiavi possono avere maiuscole o minuscole:
+
+```json
+{
+  "id": "AAMkAGI2...",
+  "internetMessageId": "<0123@example.com>",
+  "subject": "Richiesta prenotazione televisita",
+  "from": "paziente@example.com",
+  "receivedDateTime": "2026-08-19T08:00:00Z",
+  "isHtml": true,
+  "body": "<p>Buongiorno, vorrei prenotare una televisita. In allegato l'impegnativa. Grazie.</p>",
+  "attachments": [
+    {
+      "name": "impegnativa.pdf",
+      "contentType": "application/pdf",
+      "isInline": false,
+      "contentBytes": "JVBERi0xLjQK...(base64)"
+    }
+  ]
+}
+```
+
+### Risposta
+
+```json
+{
+  "id_messaggio": "<0123@example.com>",
+  "oggetto": "Richiesta prenotazione televisita",
+  "esito": "conforme",
+  "conforme": true,
+  "screening": { "superato": true, "termini": ["televisita"], "dove": ["oggetto", "corpo"] },
+  "criteri": {
+    "soddisfatti": true,
+    "trovati": ["telemedicina", "1501A"],
+    "mancanti": [],
+    "documento": "impegnativa.pdf"
+  },
+  "documenti": [
+    {
+      "nome": "impegnativa.pdf",
+      "origine": "allegato",
+      "sorgente": "pdf_text",
+      "caratteri": 512,
+      "conforme": true,
+      "trovati": ["telemedicina", "1501A"],
+      "mancanti": [],
+      "errore": null
+    }
+  ],
+  "sentiment": {
+    "punteggio": 1.0,
+    "etichetta": "positivo",
+    "termini_positivi": ["grazie"],
+    "termini_negativi": [],
+    "prenotazione": {
+      "punteggio": 1.0,
+      "e_prenotazione": true,
+      "indizi": ["prenotazione", "telemedicina", "impegnativa", "allegato conforme"]
+    }
+  },
+  "errore": null,
+  "durata_ms": 63,
+  "analizzato_il": "2026-08-19T08:00:01+00:00"
+}
+```
+
+Valori possibili di `esito`:
+
+| Esito | Significato |
+|---|---|
+| `conforme` | screening superato e documento con tutti i criteri (`conforme: true`) |
+| `non_conforme` | screening superato, ma nessun documento contiene i criteri |
+| `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
+| `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
+| `errore` | analisi interrotta: il motivo e' nel campo `errore` |
+
+`sentiment.punteggio` va da `-1` (negativo) a `+1` (positivo);
+`sentiment.prenotazione.punteggio` va da `0` a `1` ed e' confrontato con
+`sentiment.booking_threshold` per ottenere `e_prenotazione`.
+
+Codici di stato: `200` analisi eseguita (anche quando l'email non e' conforme),
+`400` payload non interpretabile, `401` chiave assente o errata, `413` richiesta
+oltre `api.max_request_bytes`. Gli errori hanno la forma
+`{"errore": "...", "codice": 400}`.
+
+## Il flusso Power Automate
+
+1. **Trigger**: *Office 365 Outlook - Quando arriva un nuovo messaggio di posta
+   elettronica (V3)*, sulla cartella da sorvegliare, con **"Includi allegati"**
+   e **"Includi allegati inline"** impostati su **Si**.
+2. **Azione HTTP**:
+   - Metodo: `POST`
+   - URI: `https://<indirizzo-del-servizio>/analizza-email`
+   - Intestazioni: `Content-Type: application/json`, `X-API-Key: <SERVICE_API_KEY>`
+   - Corpo: il messaggio del trigger. Il modo piu' semplice e' comporlo con i
+     campi dinamici:
+
+     ```
+     {
+       "internetMessageId": @{triggerOutputs()?['body/internetMessageId']},
+       "subject": @{triggerOutputs()?['body/subject']},
+       "body": @{triggerOutputs()?['body/body']},
+       "isHtml": true,
+       "from": @{triggerOutputs()?['body/from']},
+       "receivedDateTime": @{triggerOutputs()?['body/receivedDateTime']},
+       "attachments": @{triggerOutputs()?['body/attachments']}
+     }
+     ```
+
+     Gli allegati del connettore contengono gia' `name`, `contentType` e
+     `contentBytes` in base64: vanno passati cosi' come sono.
+3. **Condizione** sul risultato, per esempio
+   `body('HTTP')?['conforme']` uguale a `true`, oppure
+   `body('HTTP')?['sentiment']?['prenotazione']?['e_prenotazione']` uguale a
+   `true`.
+4. **Azione conclusiva** a scelta: *Inoltra messaggio*, creazione di un
+   elemento in un elenco, notifica in Teams, risposta automatica al paziente.
+
+Suggerimenti: impostare un **timeout** generoso sull'azione HTTP (l'OCR di un
+PDF di piu' pagine puo' richiedere qualche decina di secondi) e attivare
+**"Riprova"** solo con criterio: l'analisi e' ripetibile, ma ogni tentativo
+consuma quota OCR.
+
+## Comandi di prova
+
+**Analizzare un payload salvato su file** (stessa risposta dell'endpoint, senza
+far partire il server):
+
+```bash
+python -m inoltro_email analizza email.json
+cat email.json | python -m inoltro_email analizza
+```
+
+**Provare OCR e criteri su un singolo file**:
+
+```bash
+python -m inoltro_email check-file impegnativa.pdf --show-text
 ```
 
 ```
-File      : referto.pdf
+File      : impegnativa.pdf
 Sorgente  : pdf_text
 Caratteri : 512
-Criteri   : trovati=[televisita, 1501A] mancanti=[-]
-Esito     : CONFORME - la mail verrebbe inoltrata
+Criteri   : trovati=[telemedicina, 1501A] mancanti=[-]
+Esito     : CONFORME
 ```
 
-**Esame una tantum dei messaggi recenti** (utile come prova, e adatto a un cron
-o all'Utilita' di pianificazione di Windows):
-
-```bash
-python -m inoltro_email run-once --minutes 60 --dry-run
-```
-
-Per default si guardano solo i messaggi non letti; con `--include-read` si
-esaminano anche quelli gia' aperti.
-
-**Controllo continuo ogni cinque minuti** (modalita' di esercizio):
-
-```bash
-python -m inoltro_email watch
-```
-
-Opzioni comuni: `--config <percorso>`, `--log-level DEBUG`,
-`--dry-run` / `--no-dry-run` (hanno la precedenza sul file di configurazione).
-
-Codici di uscita: `0` esito positivo, `1` criteri non soddisfatti o errori
-durante l'elaborazione, `2` problema di configurazione, `3` casella non
-raggiungibile o token assente, `130` interruzione da tastiera.
+Opzioni comuni: `--config <percorso>`, `--log-level DEBUG`.
+Codici di uscita: `0` comando eseguito, `1` criteri non soddisfatti
+(`check-file`) o analisi interrotta (`analizza`), `2` problema di
+configurazione o file non leggibile, `130` interruzione da tastiera.
 
 ## Struttura del progetto
 
 ```
 src/inoltro_email/
-├── __main__.py        riga di comando (authenticate | watch | run-once | check-file)
+├── __main__.py        riga di comando (serve | analizza | check-file)
 ├── config.py          lettura e validazione di config.yaml + .env
-├── matching.py        normalizzazione del testo e regole televisita/1501A
-├── pipeline.py        orchestrazione: allegati -> testo -> criteri -> inoltro
-├── state.py           registro SQLite anti-duplicato
+├── inbound.py         lettura del payload di Power Automate (HTML, base64, foto del corpo)
+├── matching.py        normalizzazione del testo, screening e criteri telemedicina/1501A
+├── analysis.py        orchestrazione: screening -> OCR -> criteri -> sentiment
+├── sentiment.py       punteggio di polarita' e di intento di prenotazione
 ├── models.py          strutture dati condivise
 ├── logging_setup.py   log su console e su file rotante
-├── ocr/
-│   ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
-│   └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
-└── outlook/
-    ├── protocol.py    interfacce usate dalla pipeline (niente Graph)
-    ├── client.py      implementazione su Microsoft Graph (libreria O365)
-    └── poller.py      controllo periodico della casella
+├── api/
+│   ├── app.py         applicazione FastAPI e endpoint
+│   ├── responses.py   traduzione del risultato nel JSON di risposta
+│   └── server.py      avvio con uvicorn
+└── ocr/
+    ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
+    └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
 ```
 
-`pipeline.py` dipende soltanto dalle interfacce di `outlook/protocol.py`: la
-logica di business e' quindi collaudabile senza rete, con un client di posta e
-un client OCR fittizi.
+`analysis.py` non conosce HTTP e `api/app.py` non conosce l'OCR: la logica e'
+collaudabile senza far partire il server e senza rete.
 
 ## Test
 
@@ -207,14 +325,19 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-La suite copre le regole di riconoscimento, il client ocr.space (rete simulata,
-compresi i nuovi tentativi su HTTP 429 e l'assenza di tentativi su chiave non
-valida), la scelta fra livello di testo del PDF e OCR, la suddivisione dei PDF
-lunghi, il registro anti-duplicato, il flusso completo di inoltro, il filtro
-OData inviato a Graph e la tempistica del controllo periodico (con orologio
-finto, quindi immediata). Non serve ne' rete ne' una casella vera.
+La suite copre la lettura del payload di Power Automate (HTML, entita', base64
+malformato, foto incorporate), lo screening e i criteri, il punteggio di
+sentiment e di prenotazione, la scelta fra livello di testo del PDF e OCR, la
+suddivisione dei PDF lunghi, il client ocr.space con rete simulata (compresi i
+nuovi tentativi su HTTP 429), il flusso completo di analisi e l'endpoint HTTP
+con la sua autenticazione. Non serve ne' rete ne' una casella vera.
 
 ## Note operative
+
+**Esporre il servizio.** Power Automate deve poter raggiungere l'indirizzo:
+serve un host pubblico con HTTPS (reverse proxy, container su un servizio cloud,
+tunnel per le prove). Tenere sempre attiva `SERVICE_API_KEY` e, se possibile,
+limitare gli indirizzi IP in ingresso.
 
 **Limiti del piano gratuito di ocr.space.** File fino a 1 MB e PDF fino a 3
 pagine. I PDF piu' lunghi vengono spezzati automaticamente in blocchi da
@@ -226,21 +349,15 @@ si possono alzare `ocr.max_file_bytes` e `ocr.max_pdf_pages_per_request`.
 accurato sui documenti; se si vuole forzare l'italiano occorre impostare
 `engine: 1` (o `3`) con `language: "ita"`.
 
-**Ritardo di consegna.** Il controllo e' periodico: un messaggio viene trattato
-entro `poll_interval_minutes` dal suo arrivo (cinque minuti nella
-configurazione predefinita). Abbassare l'intervallo aumenta le chiamate a
-Graph; tenere sempre `lookback_minutes` maggiore o uguale all'intervallo.
+**Tempo di risposta.** L'analisi e' sincrona: la chiamata HTTP resta aperta
+finche' l'OCR non ha finito. Un PDF gia' provvisto di testo si risolve in
+millisecondi, una scansione di piu' pagine puo' richiedere decine di secondi.
+Se i volumi crescono conviene aumentare i `--workers` di uvicorn.
 
-**Messaggi non letti.** Con `unread_only: true` un messaggio aperto in Outlook
-prima del controllo successivo non viene piu' esaminato. Se la casella e'
-condivisa e qualcuno la legge di persona, conviene mettere `unread_only: false`
-e affidarsi al solo registro anti-duplicato.
-
-**Il token.** `state/o365_token.txt` contiene il refresh token della casella:
-va trattato come una password e non finisce nel repository (e' escluso dal
-versionamento). Se scade o viene revocato, basta rieseguire
-`python -m inoltro_email authenticate`. Il programma non ha bisogno di una
-sessione desktop: puo' girare come servizio, in un container o su un server.
+**Chiamate ripetute.** Il servizio non tiene un registro dei messaggi gia'
+analizzati: analizzare due volte la stessa email restituisce lo stesso esito ma
+consuma due volte la quota OCR. Se il flusso puo' ripetere le chiamate, conviene
+filtrare i duplicati in Power Automate sull'`internetMessageId`.
 
 **Riservatezza.** Gli allegati vengono inviati a un servizio esterno
 (ocr.space) per il riconoscimento del testo: se contengono dati personali o
@@ -248,6 +365,11 @@ sanitari occorre verificarne l'ammissibilita' prima di attivare il flusso in
 produzione. I PDF gia' provvisti di testo non escono mai dalla macchina, perche'
 vengono letti in locale.
 
-**Dove finiscono i dati.** Gli allegati sono salvati in una cartella temporanea
-di sistema, rimossa al termine dell'elaborazione di ogni messaggio. Restano su
-disco soltanto il registro `state/processed.sqlite3` e i log in `logs/`.
+**Dove finiscono i dati.** Allegati e foto vengono scritti in una cartella
+temporanea di sistema, rimossa al termine di ogni richiesta. Restano su disco
+soltanto i log in `logs/`.
+
+**Il sentiment e' un'indicazione.** Il punteggio nasce da un lessico e da regole
+esplicite: e' utile per dare priorita' o per intercettare un reclamo, non per
+decidere da solo. La decisione clinica o amministrativa resta al flusso e alle
+persone.

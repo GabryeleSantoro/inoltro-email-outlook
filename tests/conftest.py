@@ -1,11 +1,12 @@
-"""Fixture condivise: configurazione di prova, client di posta e OCR fittizi."""
+"""Fixture condivise: configurazione di prova, OCR fittizio, payload di esempio."""
 
 from __future__ import annotations
 
+import base64
 import io
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -15,16 +16,19 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from inoltro_email.config import (
-    AttachmentSettings, ForwardSettings, LoggingSettings, OcrSettings,
-    OutlookSettings, RuleSettings, Settings, StorageSettings,
+    ApiSettings, AttachmentSettings, LoggingSettings, OcrSettings, RuleSettings,
+    ScreeningSettings, SentimentSettings, Settings,
 )
-from inoltro_email.models import AttachmentFile, OcrResult
+from inoltro_email.models import OcrResult
 
 
 @pytest.fixture
-def settings(tmp_path: Path) -> Settings:
+def settings() -> Settings:
     """Configurazione minima e coerente per i test."""
     return Settings(
+        api=ApiSettings(host="127.0.0.1", port=8123, api_key=""),
+        screening=ScreeningSettings(keywords=["telemedicina", "televisita"], mode="any"),
+        rules=RuleSettings(keywords=["telemedicina"], codes=["1501A"], mode="all"),
         ocr=OcrSettings(
             api_key="chiave-di-prova",
             endpoint="https://api.ocr.space/parse/image",
@@ -34,24 +38,8 @@ def settings(tmp_path: Path) -> Settings:
             max_file_bytes=1_048_576,
             max_pdf_pages_per_request=3,
         ),
-        rules=RuleSettings(keywords=["televisita"], codes=["1501A"], mode="all"),
-        forward=ForwardSettings(
-            to=["destinatario@example.com"],
-            subject_prefix="[TELEVISITA] ",
-            body_note="Inoltro automatico.",
-            dry_run=False,
-        ),
-        outlook=OutlookSettings(
-            catch_up_minutes=30,
-            poll_interval_minutes=5,
-            lookback_minutes=5,
-            processed_category="Inoltrata",
-            client_id="id-di-prova",
-            client_secret="segreto-di-prova",
-            token_path=tmp_path / "o365_token.txt",
-        ),
         attachments=AttachmentSettings(max_bytes=10_485_760),
-        storage=StorageSettings(db_path=tmp_path / "state.sqlite3"),
+        sentiment=SentimentSettings(),
         logging=LoggingSettings(level="DEBUG", file=None),
     )
 
@@ -73,72 +61,58 @@ class FakeOcrClient:
         return OcrResult(text=self.default_text, exit_code=1)
 
 
-class FakeMessage:
-    """Messaggio di posta finto conforme al protocollo MailMessage."""
-
-    def __init__(
-        self,
-        subject: str = "Richiesta",
-        message_id: str = "<msg-1@example.com>",
-        entry_id: str = "ENTRY1",
-        attachments: Optional[Dict[str, bytes]] = None,
-        sender: str = "mittente@example.com",
-        is_read: bool = False,
-    ) -> None:
-        self.subject = subject
-        self.message_id = message_id
-        self.entry_id = entry_id
-        self.sender = sender
-        self.attachments = attachments or {}
-        self.is_read = is_read
-
-    @property
-    def has_attachments(self) -> bool:
-        return bool(self.attachments)
-
-
-class FakeMailClient:
-    """Client di posta finto: registra interrogazioni, inoltri e categorie."""
-
-    def __init__(self, messages: Optional[List[FakeMessage]] = None) -> None:
-        self.messages = messages or []
-        self.forwarded: List[Dict[str, object]] = []
-        self.categories: List[str] = []
-        self.queries: List[Dict[str, object]] = []
-
-    def get_message(self, entry_id: str) -> Optional[FakeMessage]:
-        return next((m for m in self.messages if m.entry_id == entry_id), None)
-
-    def recent_messages(self, minutes: int, unread_only: bool = True) -> List[FakeMessage]:
-        self.queries.append({"minutes": minutes, "unread_only": unread_only})
-        if unread_only:
-            return [message for message in self.messages if not message.is_read]
-        return list(self.messages)
-
-    def save_attachments(self, message: FakeMessage, dest_dir: Path) -> List[AttachmentFile]:
-        dest_dir = Path(dest_dir)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        saved = []
-        for name, content in message.attachments.items():
-            target = dest_dir / name
-            target.write_bytes(content)
-            saved.append(AttachmentFile(target, name, len(content)))
-        return saved
-
-    def forward(self, message, to, cc, subject_prefix, body_note) -> None:
-        self.forwarded.append({
-            "subject": message.subject, "to": list(to), "cc": list(cc),
-            "prefix": subject_prefix, "note": body_note,
-        })
-
-    def mark_processed(self, message, category: str) -> None:
-        if category:
-            self.categories.append(category)
-
-
 @pytest.fixture
 def fake_ocr() -> FakeOcrClient:
     return FakeOcrClient()
+
+
+# ------------------------------------------------------- payload di esempio
+
+
+def b64(content: bytes) -> str:
+    return base64.b64encode(content).decode("ascii")
+
+
+def attachment_payload(
+    name: str,
+    content: bytes,
+    *,
+    content_type: str = "application/pdf",
+    inline: bool = False,
+) -> Dict[str, Any]:
+    """Allegato nella forma prodotta dal connettore Office 365 Outlook."""
+    return {
+        "name": name,
+        "contentType": content_type,
+        "contentBytes": b64(content),
+        "size": len(content),
+        "isInline": inline,
+    }
+
+
+def email_payload(
+    subject: str = "Richiesta prenotazione televisita",
+    body: str = "Buongiorno, vorrei prenotare una televisita. In allegato l'impegnativa. Grazie.",
+    attachments: Optional[List[Dict[str, Any]]] = None,
+    **extra: Any,
+) -> Dict[str, Any]:
+    """Payload come quello inviato dall'azione HTTP di Power Automate."""
+    payload: Dict[str, Any] = {
+        "id": "AAMkAGI2TEST",
+        "internetMessageId": "<msg-1@example.com>",
+        "subject": subject,
+        "body": body,
+        "isHtml": False,
+        "from": "paziente@example.com",
+        "receivedDateTime": "2026-08-19T08:00:00Z",
+        "hasAttachment": bool(attachments),
+        "attachments": attachments or [],
+    }
+    payload.update(extra)
+    return payload
+
+
+# ------------------------------------------------------------ file di prova
 
 
 def make_pdf(text_pages: List[str]) -> bytes:
