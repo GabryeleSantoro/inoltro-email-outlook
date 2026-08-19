@@ -34,6 +34,15 @@ from .sentiment import analyze_sentiment
 logger = logging.getLogger(__name__)
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_BODY_PREVIEW_CHARS = 4000
+
+
+def _clip(text: str, limit: int) -> str:
+    """Restituisce un'anteprima dei log senza allagare console/file."""
+    clean = text.strip()
+    if len(clean) <= limit:
+        return clean
+    return f"{clean[:limit]}... [troncato, totale={len(clean)} caratteri]"
 
 
 class EmailAnalyzer:
@@ -52,6 +61,7 @@ class EmailAnalyzer:
         """
         started = time.monotonic()
         subject = email.subject or "(senza oggetto)"
+        self._log_inbound_email(email)
 
         screening = screen(email.subject, email.body_text, self._settings.screening)
         logger.info(
@@ -89,6 +99,48 @@ class EmailAnalyzer:
             email, esito, screening, sentiment,
             started=started, attachments=analyses, match=match, matched_attachment=matched_name,
         )
+
+    def _log_inbound_email(self, email: InboundEmail) -> None:
+        """Logga il contenuto in ingresso per facilitare il debug del flusso."""
+        logger.info(
+            "Email ricevuta: id=%s da=%s ricevuta_il=%s oggetto='%s'",
+            email.key,
+            email.sender or "mittente ignoto",
+            email.received_at or "sconosciuta",
+            email.subject or "(senza oggetto)",
+        )
+
+        if email.body_text.strip():
+            logger.info(
+                "Corpo testo (%d caratteri): %s",
+                len(email.body_text),
+                _clip(email.body_text, _BODY_PREVIEW_CHARS),
+            )
+            logger.debug("Corpo testo completo:\n%s", email.body_text)
+        else:
+            logger.info("Corpo testo vuoto.")
+
+        if email.body_html.strip():
+            logger.debug(
+                "Corpo HTML (%d caratteri):\n%s",
+                len(email.body_html),
+                email.body_html,
+            )
+
+        if not email.attachments:
+            logger.info("Nessun allegato nel payload.")
+            return
+
+        logger.info("Allegati ricevuti: %d", len(email.attachments))
+        for index, item in enumerate(email.attachments, start=1):
+            logger.info(
+                "Allegato %d: nome='%s' origine=%s tipo=%s dimensione=%d byte",
+                index,
+                item.name,
+                item.origine.value,
+                item.content_type or "sconosciuto",
+                item.size_bytes,
+            )
 
     # ------------------------------------------------------ allegati e foto
 

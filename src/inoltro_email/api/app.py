@@ -57,6 +57,14 @@ RICHIESTA_ESEMPIO = {
 }
 
 
+def _payload_to_log(payload: Any) -> str:
+    """Serializza un payload in modo robusto per il logging di debug."""
+    try:
+        return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+    except Exception:  # noqa: BLE001 - non deve mai bloccare la gestione richiesta
+        return repr(payload)
+
+
 def create_app(
     settings: Optional[Settings] = None,
     *,
@@ -113,6 +121,21 @@ def create_app(
             "documentazione": "/docs",
         }
 
+    @app.post("/", tags=["servizio"], summary="Endpoint errato")
+    def endpoint_errato_root_post() -> JSONResponse:
+        """Aiuta a diagnosticare integrazioni che postano sul percorso sbagliato."""
+        logger.warning(
+            "Richiesta ricevuta su POST /. Endpoint corretto: POST /analizza-email"
+        )
+        return JSONResponse(
+            {
+                "errore": "Endpoint errato: usare POST /analizza-email.",
+                "codice": status.HTTP_405_METHOD_NOT_ALLOWED,
+                "endpoint_corretto": "/analizza-email",
+            },
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
     @app.get("/salute", tags=["servizio"], summary="Controllo di funzionamento")
     def salute() -> dict:
         """Sonda leggera per bilanciatori e monitoraggi: non chiama l'OCR."""
@@ -153,6 +176,11 @@ def create_app(
                 max_attachment_bytes=settings.attachments.max_bytes,
             )
         except InboundError as exc:
+            logger.error(
+                "Payload non interpretabile: %s\nPayload completo:\n%s",
+                exc,
+                _payload_to_log(payload),
+            )
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
         logger.info(
@@ -216,6 +244,12 @@ async def _read_json(request: Request, max_bytes: int) -> Any:
     try:
         return json.loads(raw)
     except (ValueError, UnicodeDecodeError) as exc:
+        raw_text = raw.decode("utf-8", errors="replace")
+        logger.error(
+            "JSON non valido: %s\nPayload completo (raw):\n%s",
+            exc,
+            raw_text,
+        )
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail=f"JSON non valido: {exc}"
         ) from exc
