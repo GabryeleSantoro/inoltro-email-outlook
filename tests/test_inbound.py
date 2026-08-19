@@ -1,0 +1,163 @@
+"""Test della lettura del payload inviato da Power Automate."""
+
+from __future__ import annotations
+
+import base64
+
+import pytest
+from conftest import attachment_payload, b64, email_payload
+
+from inoltro_email.inbound import InboundError, decode_base64, html_to_text, parse_email
+from inoltro_email.models import Origine
+
+
+def test_legge_oggetto_corpo_e_mittente() -> None:
+    email = parse_email(email_payload())
+
+    assert email.subject == "Richiesta prenotazione televisita"
+    assert "prenotare una televisita" in email.body_text
+    assert email.sender == "paziente@example.com"
+    assert email.internet_message_id == "<msg-1@example.com>"
+    assert email.key == "<msg-1@example.com>"
+
+
+def test_corpo_html_ridotto_a_testo() -> None:
+    payload = email_payload(
+        body="<html><body><p>Buongiorno,</p><div>vorrei una <b>televisita</b>.</div>"
+             "<style>p{color:red}</style></body></html>",
+        isHtml=True,
+    )
+    email = parse_email(payload)
+
+    assert "Buongiorno," in email.body_text
+    assert "vorrei una televisita." in email.body_text
+    assert "color:red" not in email.body_text  # lo stile non e' testo del messaggio
+
+
+def test_html_riconosciuto_anche_senza_flag() -> None:
+    email = parse_email(email_payload(body="<div>Richiesta di <b>telemedicina</b></div>"))
+    assert email.body_text == "Richiesta di telemedicina"
+
+
+def test_entita_html_decodificate() -> None:
+    email = parse_email(email_payload(body="<p>Visita &egrave; urgente &amp; necessaria</p>",
+                                      isHtml=True))
+    assert "è urgente & necessaria" in email.body_text
+
+
+def test_forma_graph_del_corpo_e_del_mittente() -> None:
+    """Microsoft Graph annida corpo e mittente in oggetti dedicati."""
+    payload = {
+        "subject": "Televisita",
+        "body": {"contentType": "html", "content": "<p>Testo del messaggio</p>"},
+        "from": {"emailAddress": {"address": "medico@example.com", "name": "Studio"}},
+    }
+    email = parse_email(payload)
+
+    assert email.body_text == "Testo del messaggio"
+    assert email.sender == "medico@example.com"
+
+
+def test_chiavi_con_maiuscole_accettate() -> None:
+    email = parse_email({"Subject": "Telemedicina", "Body": "corpo del messaggio"})
+
+    assert email.subject == "Telemedicina"
+    assert email.body_text == "corpo del messaggio"
+
+
+def test_allegati_decodificati() -> None:
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", b"%PDF-1.4 finto")])
+    email = parse_email(payload)
+
+    assert len(email.attachments) == 1
+    allegato = email.attachments[0]
+    assert allegato.name == "impegnativa.pdf"
+    assert allegato.content == b"%PDF-1.4 finto"
+    assert allegato.origine is Origine.ALLEGATO
+    assert allegato.extension == ".pdf"
+
+
+def test_allegato_inline_marcato_come_foto_del_corpo() -> None:
+    payload = email_payload(attachments=[
+        attachment_payload("foto.jpg", b"jpeg", content_type="image/jpeg", inline=True),
+    ])
+    email = parse_email(payload)
+
+    assert email.attachments[0].origine is Origine.CORPO
+
+
+def test_foto_inline_escluse_su_richiesta() -> None:
+    payload = email_payload(attachments=[
+        attachment_payload("foto.jpg", b"jpeg", content_type="image/jpeg", inline=True),
+        attachment_payload("impegnativa.pdf", b"%PDF"),
+    ])
+    email = parse_email(payload, include_inline_images=False)
+
+    assert [item.name for item in email.attachments] == ["impegnativa.pdf"]
+
+
+def test_immagine_data_uri_nel_corpo_diventa_allegato() -> None:
+    """La foto incollata nel corpo arriva come <img src="data:...">."""
+    immagine = base64.b64encode(b"contenuto-png").decode()
+    payload = email_payload(
+        body=f'<p>Ecco l\'impegnativa:</p><img src="data:image/png;base64,{immagine}">',
+        isHtml=True,
+    )
+    email = parse_email(payload)
+
+    assert len(email.attachments) == 1
+    foto = email.attachments[0]
+    assert foto.origine is Origine.CORPO
+    assert foto.name.endswith(".png")
+    assert foto.content == b"contenuto-png"
+
+
+def test_immagini_remote_nel_corpo_ignorate() -> None:
+    """Un <img> che punta a un URL non e' scaricabile: va semplicemente saltato."""
+    payload = email_payload(body='<p>testo</p><img src="https://example.com/logo.png">',
+                            isHtml=True)
+    assert parse_email(payload).attachments == []
+
+
+def test_allegato_oltre_il_limite_scartato() -> None:
+    payload = email_payload(attachments=[attachment_payload("grande.pdf", b"x" * 100)])
+    email = parse_email(payload, max_attachment_bytes=10)
+
+    assert email.attachments == []
+
+
+def test_allegato_senza_estensione_prende_quella_del_mime() -> None:
+    payload = email_payload(attachments=[
+        attachment_payload("scansione", b"jpeg", content_type="image/jpeg"),
+    ])
+    assert parse_email(payload).attachments[0].name == "scansione.jpg"
+
+
+def test_allegato_con_base64_rotto_ignorato_senza_bloccare_gli_altri() -> None:
+    payload = email_payload(attachments=[
+        {"name": "rotto.pdf", "contentBytes": "!!!non-base64!!!"},
+        attachment_payload("buono.pdf", b"%PDF"),
+    ])
+    email = parse_email(payload)
+
+    assert [item.name for item in email.attachments] == ["buono.pdf"]
+
+
+def test_payload_non_oggetto_rifiutato() -> None:
+    with pytest.raises(InboundError, match="oggetto JSON"):
+        parse_email(["non", "un", "oggetto"])
+
+
+def test_email_vuota_rifiutata() -> None:
+    with pytest.raises(InboundError, match="ne' oggetto ne' corpo"):
+        parse_email({"subject": "", "body": ""})
+
+
+def test_base64_tollerante_a_spazi_e_padding() -> None:
+    valore = b64(b"ciao")
+    assert decode_base64(f"  {valore[:2]}\n{valore[2:]}  ") == b"ciao"
+    assert decode_base64(valore.rstrip("=")) == b"ciao"
+
+
+def test_html_to_text_mantiene_gli_a_capo() -> None:
+    assert html_to_text("<p>prima riga</p><p>seconda riga</p>") == "prima riga\n\nseconda riga"

@@ -9,21 +9,33 @@ import pytest
 from inoltro_email.config import ConfigError, Settings
 
 VALID_YAML = """
+api:
+  host: "127.0.0.1"
+  port: 9000
+screening:
+  keywords: ["telemedicina", "televisita"]
+  mode: any
+rules:
+  keywords: ["telemedicina"]
+  codes: ["1501A"]
+  mode: all
 ocr:
   engine: 2
   max_pdf_pages_per_request: 3
-rules:
-  keywords: ["televisita"]
-  codes: ["1501A"]
-  mode: all
-forward:
-  to: ["destinatario@example.com"]
-  dry_run: true
 attachments:
   allowed_extensions: ["PDF", ".JPG"]
-storage:
-  db_path: "state/db.sqlite3"
+logging:
+  level: "WARNING"
+  file: null
 """
+
+
+@pytest.fixture(autouse=True)
+def ambiente_pulito(monkeypatch: pytest.MonkeyPatch) -> None:
+    """I test non devono dipendere dal .env della macchina di sviluppo."""
+    monkeypatch.setattr("inoltro_email.config.load_dotenv", lambda *a, **k: None)
+    for name in ("OCR_SPACE_API_KEY", "SERVICE_API_KEY", "API_HOST", "PORT"):
+        monkeypatch.delenv(name, raising=False)
 
 
 def write_config(tmp_path: Path, content: str) -> Path:
@@ -37,48 +49,79 @@ def test_carica_configurazione_valida(tmp_path: Path, monkeypatch: pytest.Monkey
     settings = Settings.load(write_config(tmp_path, VALID_YAML))
 
     assert settings.ocr.api_key == "chiave-di-prova"
+    assert settings.api.port == 9000
+    assert settings.screening.keywords == ["telemedicina", "televisita"]
     assert settings.rules.codes == ["1501A"]
-    assert settings.forward.dry_run is True
     # Le estensioni vengono normalizzate: minuscole e con il punto iniziale.
     assert settings.attachments.allowed_extensions == [".pdf", ".jpg"]
 
 
-def test_chiave_api_mancante(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OCR_SPACE_API_KEY", raising=False)
-    monkeypatch.setattr("inoltro_email.config.load_dotenv", lambda *a, **k: None)
+def test_chiave_ocr_mancante(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="OCR_SPACE_API_KEY"):
         Settings.load(write_config(tmp_path, VALID_YAML))
 
 
-def test_file_assente(tmp_path: Path) -> None:
+def test_file_esplicito_assente(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="non trovato"):
         Settings.load(tmp_path / "manca.yaml")
+
+
+def test_senza_file_valgono_i_valori_predefiniti(tmp_path: Path,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    """In un container si configura tutto da variabili d'ambiente."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    settings = Settings.load()
+
+    assert settings.api.port == 8000
+    assert settings.screening.keywords == ["telemedicina", "televisita"]
+    assert settings.rules.keywords == ["telemedicina"]
+    assert settings.rules.codes == ["1501A"]
+
+
+def test_ambiente_ha_la_precedenza(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    monkeypatch.setenv("SERVICE_API_KEY", "chiave-power-automate")
+    monkeypatch.setenv("API_HOST", "0.0.0.0")
+    monkeypatch.setenv("PORT", "8080")
+
+    settings = Settings.load(write_config(tmp_path, VALID_YAML))
+
+    assert settings.api.api_key == "chiave-power-automate"
+    assert settings.api.host == "0.0.0.0"
+    assert settings.api.port == 8080  # sovrascrive il 9000 del YAML
+
+
+def test_porta_non_numerica(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    monkeypatch.setenv("PORT", "ottomila")
+    with pytest.raises(ConfigError, match="PORT"):
+        Settings.load(write_config(tmp_path, VALID_YAML))
 
 
 def test_yaml_non_valido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
     with pytest.raises(ConfigError, match="YAML non valido"):
-        Settings.load(write_config(tmp_path, "forward: [non\n  - chiuso: ["))
+        Settings.load(write_config(tmp_path, "rules: [non\n  - chiuso: ["))
 
 
-def test_serve_almeno_un_destinatario(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sezione_non_mappa(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML.replace('  to: ["destinatario@example.com"]', "  to: []")
-    with pytest.raises(ConfigError, match="forward.to"):
-        Settings.load(write_config(tmp_path, yaml_text))
-
-
-def test_indirizzo_non_valido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML.replace('"destinatario@example.com"', '"non-un-indirizzo"')
-    with pytest.raises(ConfigError, match="non valido"):
-        Settings.load(write_config(tmp_path, yaml_text))
+    with pytest.raises(ConfigError, match="sezione 'rules'"):
+        Settings.load(write_config(tmp_path, "rules:\n  - televisita\n"))
 
 
 def test_modalita_regole_sconosciuta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML.replace("mode: all", "mode: forse")
+    yaml_text = VALID_YAML.replace("  mode: all", "  mode: forse")
     with pytest.raises(ConfigError, match="rules.mode"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+
+def test_screening_senza_parole(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML.replace('  keywords: ["telemedicina", "televisita"]', "  keywords: []")
+    with pytest.raises(ConfigError, match="screening.keywords"):
         Settings.load(write_config(tmp_path, yaml_text))
 
 
@@ -89,82 +132,38 @@ def test_engine_ocr_non_valido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         Settings.load(write_config(tmp_path, yaml_text))
 
 
+def test_porta_fuori_intervallo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML.replace("port: 9000", "port: 70000")
+    with pytest.raises(ConfigError, match="api.port"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+
+def test_soglia_di_prenotazione_fuori_intervallo(tmp_path: Path,
+                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + "sentiment:\n  booking_threshold: 3.0\n"
+    with pytest.raises(ConfigError, match="booking_threshold"):
+        Settings.load(write_config(tmp_path, yaml_text))
+
+
 def test_config_di_esempio_e_valido(monkeypatch: pytest.MonkeyPatch) -> None:
     """config.example.yaml deve poter essere copiato e usato cosi' com'e'."""
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
     example = Path(__file__).resolve().parents[1] / "config.example.yaml"
     settings = Settings.load(example)
-    assert settings.rules.keywords == ["televisita"]
+
+    assert settings.screening.keywords == ["telemedicina", "televisita"]
+    assert settings.screening.mode == "any"
+    assert settings.rules.keywords == ["telemedicina"]
     assert settings.rules.codes == ["1501A"]
-    assert settings.forward.dry_run is True  # default prudente
-
-
-def test_auth_flow_sconosciuto(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML + "outlook:\n  auth_flow: magico\n"
-    with pytest.raises(ConfigError, match="outlook.auth_flow"):
-        Settings.load(write_config(tmp_path, yaml_text))
-
-
-def test_flusso_applicativo_richiede_la_casella(tmp_path: Path,
-                                                monkeypatch: pytest.MonkeyPatch) -> None:
-    """Senza utente connesso non si sa quale casella leggere."""
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML + "outlook:\n  auth_flow: credentials\n"
-    with pytest.raises(ConfigError, match="outlook.mailbox"):
-        Settings.load(write_config(tmp_path, yaml_text))
-
-    yaml_text += '  mailbox: "casella@example.com"\n'
-    settings = Settings.load(write_config(tmp_path, yaml_text))
-    assert settings.outlook.mailbox == "casella@example.com"
-
-
-def test_intervallo_di_controllo_non_valido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML + "outlook:\n  poll_interval_minutes: 0\n"
-    with pytest.raises(ConfigError, match="poll_interval_minutes"):
-        Settings.load(write_config(tmp_path, yaml_text))
-
-
-def test_credenziali_microsoft_dall_ambiente(tmp_path: Path,
-                                             monkeypatch: pytest.MonkeyPatch) -> None:
-    """Client id, segreto e tenant non stanno nel YAML ma nell'ambiente."""
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    monkeypatch.setenv("MS_CLIENT_ID", "id-applicazione")
-    monkeypatch.setenv("MS_CLIENT_SECRET", "segreto")
-    monkeypatch.setenv("MS_TENANT_ID", "contoso.onmicrosoft.com")
-
-    settings = Settings.load(write_config(tmp_path, VALID_YAML))
-
-    assert settings.outlook.client_id == "id-applicazione"
-    assert settings.outlook.client_secret == "segreto"
-    assert settings.outlook.tenant_id == "contoso.onmicrosoft.com"
-
-
-def test_tenant_predefinito(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    monkeypatch.delenv("MS_TENANT_ID", raising=False)
-    monkeypatch.setattr("inoltro_email.config.load_dotenv", lambda *a, **k: None)
-
-    assert Settings.load(write_config(tmp_path, VALID_YAML)).outlook.tenant_id == "common"
-
-
-def test_valori_di_controllo_predefiniti(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Senza sezione 'outlook' si controlla la posta ogni 5 minuti, solo non letti."""
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    settings = Settings.load(write_config(tmp_path, VALID_YAML))
-
-    assert settings.outlook.poll_interval_minutes == 5
-    assert settings.outlook.lookback_minutes == 5
-    assert settings.outlook.unread_only is True
+    assert settings.attachments.include_inline_images is True
 
 
 def test_ensure_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
     settings = Settings.load(write_config(tmp_path, VALID_YAML))
-    settings.storage.db_path = tmp_path / "dati" / "db.sqlite3"
-    settings.logging.file = tmp_path / "registri" / "app.log"
-    settings.outlook.token_path = tmp_path / "credenziali" / "o365_token.txt"
+    settings.logging.file = tmp_path / "registri" / "servizio.log"
     settings.ensure_directories()
-    assert (tmp_path / "dati").is_dir() and (tmp_path / "registri").is_dir()
-    assert (tmp_path / "credenziali").is_dir()
+
+    assert (tmp_path / "registri").is_dir()

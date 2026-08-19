@@ -1,4 +1,10 @@
-"""Regole di riconoscimento sul testo estratto dagli allegati.
+"""Regole di riconoscimento su oggetto, corpo e testo degli allegati.
+
+Il modulo copre i due controlli del servizio:
+
+* ``screen``   -> oggetto e corpo parlano di telemedicina/televisita?
+* ``evaluate`` -> il testo letto da allegati e foto contiene tutti i criteri
+                  (per esempio "telemedicina" **e** il codice "1501A")?
 
 Il testo che arriva dall'OCR non e' mai pulito: puo' contenere spazi di troppo
 ("15 A 10"), trattini ("15-A10"), a capo in mezzo alle parole e le classiche
@@ -14,8 +20,8 @@ import re
 import unicodedata
 from typing import Iterable, List
 
-from .config import RuleSettings
-from .models import MatchReport
+from .config import RuleSettings, ScreeningSettings
+from .models import MatchReport, ScreeningReport
 
 # Confusioni piu' comuni dei motori OCR. Applicate solo ai codici: su una
 # parola come "televisita" trasformerebbero le lettere in cifre senza motivo.
@@ -97,6 +103,37 @@ def evaluate(text: str, rules: RuleSettings) -> MatchReport:
         missing_keywords=missing_keywords,
         missing_codes=missing_codes,
     )
+
+
+def screen(subject: str, body: str, settings: ScreeningSettings) -> ScreeningReport:
+    """Prima verifica: i termini configurati compaiono in oggetto o corpo?
+
+    Restituisce anche *dove* sono stati trovati, cosi' chi consuma la risposta
+    puo' distinguere un oggetto esplicito da una parola persa nel corpo.
+    """
+    subject_collapsed = alnum_collapse(subject)
+    body_collapsed = alnum_collapse(body)
+
+    in_subject: List[str] = []
+    in_body: List[str] = []
+    missing: List[str] = []
+    for keyword in _clean(settings.keywords):
+        found = False
+        if contains_keyword(subject_collapsed, keyword):
+            in_subject.append(keyword)
+            found = True
+        if contains_keyword(body_collapsed, keyword):
+            in_body.append(keyword)
+            found = True
+        if not found:
+            missing.append(keyword)
+
+    if settings.mode == "all":
+        passed = not missing and bool(in_subject or in_body)
+    else:  # "any"
+        passed = bool(in_subject or in_body)
+
+    return ScreeningReport(passed=passed, in_subject=in_subject, in_body=in_body)
 
 
 def _clean(values: Iterable[str]) -> List[str]:
