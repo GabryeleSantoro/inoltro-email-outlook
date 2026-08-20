@@ -59,8 +59,11 @@ class ScreeningSettings:
     # any = basta uno dei termini (impostazione voluta: telemedicina O televisita)
     # all = servono tutti
     mode: str = "any"
-    # Se lo screening non passa non si chiama l'OCR: si risparmia quota.
-    stop_on_failure: bool = True
+    # true = se lo screening non passa gli allegati non vengono nemmeno letti.
+    # false (predefinito) = si leggono comunque: il contenuto di un allegato
+    # puo' ribaltare un oggetto che non dice nulla, e il verdetto finale si
+    # vuole con tutti i dati alla mano.
+    stop_on_failure: bool = False
 
 
 @dataclass
@@ -83,6 +86,13 @@ class OcrSettings:
     max_retries: int = 3
     max_file_bytes: int = 1_048_576
     max_pdf_pages_per_request: int = 3
+    # true = ogni documento leggibile passa dall'OCR, anche un PDF che ha gia'
+    # il proprio livello di testo: i due testi vengono uniti. false = il PDF
+    # con il testo non viene mandato all'OCR (meno quota, meno dati).
+    always_call: bool = True
+    # true = un'immagine oltre max_file_bytes viene ridimensionata invece che
+    # saltata. Una foto di impegnativa supera sempre il MB del piano gratuito.
+    resize_oversized_images: bool = True
 
 
 @dataclass
@@ -94,9 +104,15 @@ class AttachmentSettings:
     include_inline_images: bool = True
     # Quanti file al massimo passare all'OCR per ogni email.
     max_files: int = 10
-    # false = ci si ferma al primo file conforme (meno chiamate all'OCR);
-    # true  = si leggono comunque tutti i file, utile per diagnosticare.
-    analyze_all: bool = False
+    # true = si leggono tutti i file allegati, anche dopo averne trovato uno
+    # conforme: il verdetto tiene conto di tutto quello che e' arrivato.
+    # false = ci si ferma al primo conforme (meno chiamate all'OCR).
+    analyze_all: bool = True
+    # Restituisce nella risposta il testo letto da ogni documento.
+    return_text: bool = True
+    # Quanto testo restituire per documento (0 = tutto). Serve solo a non far
+    # esplodere la risposta con un referto di venti pagine.
+    max_text_chars: int = 20_000
 
 
 @dataclass
@@ -126,8 +142,9 @@ class ConfidenceSettings:
     # Sopra questa percentuale e' considerato una prenotazione di telemedicina.
     booking_threshold: float = 60.0
     # Sotto questa percentuale (calcolata prima dell'OCR, su oggetto, corpo e
-    # nomi dei file) non si spende una chiamata all'OCR.
-    min_percent_for_ocr: float = 25.0
+    # nomi dei file) non si spende una chiamata all'OCR. Zero = si legge
+    # sempre tutto, che e' l'impostazione predefinita.
+    min_percent_for_ocr: float = 0.0
     # Termini costanti dei due punteggi: piu' sono negativi, piu' servono
     # indizi per arrivare a una percentuale alta.
     telemedicine_bias: float = -2.2
@@ -236,7 +253,9 @@ class Settings:
         screening = ScreeningSettings(
             keywords=_as_str_list(screening_raw.get("keywords"), ["telemedicina", "televisita"]),
             mode=str(screening_raw.get("mode", ScreeningSettings.mode)).lower(),
-            stop_on_failure=bool(screening_raw.get("stop_on_failure", True)),
+            stop_on_failure=bool(
+                screening_raw.get("stop_on_failure", ScreeningSettings.stop_on_failure)
+            ),
         )
         rules = RuleSettings(
             keywords=_as_str_list(rules_raw.get("keywords"), ["telemedicina"]),
@@ -254,6 +273,10 @@ class Settings:
             max_pdf_pages_per_request=int(
                 ocr_raw.get("max_pdf_pages_per_request", OcrSettings.max_pdf_pages_per_request)
             ),
+            always_call=bool(ocr_raw.get("always_call", OcrSettings.always_call)),
+            resize_oversized_images=bool(
+                ocr_raw.get("resize_oversized_images", OcrSettings.resize_oversized_images)
+            ),
         )
         attachments = AttachmentSettings(
             allowed_extensions=[
@@ -263,7 +286,11 @@ class Settings:
             max_bytes=int(att_raw.get("max_bytes", AttachmentSettings.max_bytes)),
             include_inline_images=bool(att_raw.get("include_inline_images", True)),
             max_files=int(att_raw.get("max_files", AttachmentSettings.max_files)),
-            analyze_all=bool(att_raw.get("analyze_all", False)),
+            analyze_all=bool(att_raw.get("analyze_all", AttachmentSettings.analyze_all)),
+            return_text=bool(att_raw.get("return_text", AttachmentSettings.return_text)),
+            max_text_chars=int(
+                att_raw.get("max_text_chars", AttachmentSettings.max_text_chars)
+            ),
         )
         local_files = LocalFileSettings(
             enabled=bool(local_raw.get("enabled", True)),
@@ -350,6 +377,8 @@ class Settings:
             raise ConfigError("attachments.max_bytes deve essere > 0.")
         if self.attachments.max_files < 1:
             raise ConfigError("attachments.max_files deve essere >= 1.")
+        if self.attachments.max_text_chars < 0:
+            raise ConfigError("attachments.max_text_chars deve essere >= 0 (0 = nessun limite).")
         for name, value in (
             ("telemedicine_threshold", self.confidence.telemedicine_threshold),
             ("booking_threshold", self.confidence.booking_threshold),

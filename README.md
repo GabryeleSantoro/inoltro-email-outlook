@@ -4,11 +4,13 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
 **Power Automate**. Per ogni messaggio ricevuto il servizio:
 
 1. verifica che **oggetto o corpo** parlino di **telemedicina** o **televisita**;
-2. legge **allegati e foto** con l'OCR di [ocr.space](https://ocr.space/ocrapi)
-   e controlla che il testo contenga **sia "telemedicina" sia il codice
-   "1501A"**. Gli allegati possono arrivare in base64 dentro il payload oppure
-   **come percorso su disco**: in quel caso il file viene letto da dove si trova
-   e mandato all'OCR senza ricopiarlo;
+2. manda **tutti** gli allegati e le foto all'OCR di
+   [ocr.space](https://ocr.space/ocrapi), **restituisce il testo letto** e
+   controlla che contenga **sia "telemedicina" sia il codice "1501A"**. Gli
+   allegati possono arrivare in base64 dentro il payload oppure **come percorso
+   su disco**: in quel caso il file viene letto da dove si trova e mandato
+   all'OCR senza ricopiarlo. Le immagini troppo grandi per l'API vengono
+   **ridimensionate**, non scartate;
 3. restituisce due **percentuali di sicurezza**: quanto e' sicuro che il
    messaggio riguardi la **telemedicina** e quanto e' sicuro che sia una
    **prenotazione** di telemedicina, con l'elenco degli indizi che le hanno
@@ -27,22 +29,25 @@ Power Automate (nuova email)  --POST /analizza-email-->  servizio
                                                             |
                                             oggetto + corpo: telemedicina/televisita?
                                                             |
-                                      no <-----------------/ \-----------------> si
                                        |                                          |
-                            esito "scartata"                    allegati e foto del corpo
-                            (nessuna chiamata OCR)                        |
-                                                          PDF con testo? --si--> pypdf (niente OCR)
-                                                                  |no
-                                                                  v
-                                                          ocr.space (POST /parse/image)
-                                                                  |
-                                                    criteri: "telemedicina" AND "1501A"
-                                                                  |
-                                                     esito "conforme" / "non_conforme"
-                                                                  |
-                                             + sentiment  + punteggio di prenotazione
-                                                                  |
-                                                              risposta JSON
+                                       +--------------------+---------------------+
+                                                            |
+                                        tutti gli allegati e le foto del corpo
+                                                            |
+                              PDF con livello di testo --> pypdf  --+
+                              immagine oltre 1 MB --> ridimensionata |
+                                                            |        |
+                                            ocr.space (POST /parse/image)
+                                                            |        |
+                                                    testi uniti <----+
+                                                            |
+                                      criteri: "telemedicina" AND "1501A"
+                                          su ogni documento, poi riassunti
+                                                            |
+                                    percentuali: telemedicina + prenotazione
+                                              + sentiment
+                                                            |
+                                        risposta JSON (con il testo letto)
 ```
 
 Alcune scelte di funzionamento:
@@ -58,12 +63,24 @@ Alcune scelte di funzionamento:
   virgolette non protette (`style="..."`) e percorsi Windows (`C:\Users\...`),
   tutte cose che rendono il JSON non valido. Il servizio lo legge lo stesso e
   segnala nella risposta (`avvisi`) che cosa ha dovuto aggiustare.
-- **Screening prima dell'OCR**: se oggetto e corpo non parlano di telemedicina
-  non si spende nemmeno una chiamata all'API (`screening.stop_on_failure`), e
-  nemmeno se la sicurezza resta sotto `confidence.min_percent_for_ocr`.
-- **Risparmio di quota OCR**: se un PDF ha gia' il livello di testo lo si legge
-  con `pypdf`, senza uscire dalla macchina; e non appena un documento soddisfa i
-  criteri gli altri non vengono piu' analizzati.
+- **Si legge tutto, poi si decide.** Ogni allegato leggibile passa dall'OCR e
+  ogni testo concorre al verdetto: nessuna scorciatoia si ferma al primo
+  documento utile, e nessun filtro a monte impedisce di leggere gli allegati di
+  un messaggio dall'oggetto generico. Un'impegnativa allegata a un'email che
+  dice solo "in allegato quanto richiesto" e' esattamente il caso che si vuole
+  riconoscere.
+- **Un PDF con il testo passa lo stesso dall'OCR**: il livello di testo e'
+  esatto dove c'e', l'OCR recupera cio' che nel PDF e' solo immagine (timbri,
+  firme, moduli scansionati incollati in un PDF nativo). I due testi vengono
+  uniti e la sorgente risulta `pdf_text+ocr`.
+- **Le immagini grandi si riducono, non si perdono**: una foto di impegnativa
+  scattata col telefono supera sempre il MB del piano gratuito. Viene scalata
+  per gradi finche' non rientra, conservando la risoluzione piu' alta possibile
+  perche' i caratteri restino leggibili.
+- **Chi vuole risparmiare quota puo' ancora farlo**: `ocr.always_call: false`,
+  `attachments.analyze_all: false`, `screening.stop_on_failure: true` e
+  `confidence.min_percent_for_ocr` riportano il servizio al comportamento
+  parsimonioso, al prezzo di vedere meno dati.
 - **Le foto del corpo contano**: spesso l'impegnativa e' fotografata e incollata
   nel messaggio. Vengono riconosciute sia come allegati `isInline`, sia come
   immagini `<img src="data:image/...;base64,...">` dentro l'HTML.
@@ -126,6 +143,11 @@ Le voci da rivedere subito:
 | `rules.keywords` / `rules.codes` | criteri sul testo dei documenti; con `mode: all` servono tutti |
 | `attachments.include_inline_images` | analizza anche le foto incorporate nel corpo |
 | `attachments.max_files` | quanti file al massimo passare all'OCR per email |
+| `attachments.analyze_all` | `true` legge tutti i file, `false` si ferma al primo conforme |
+| `attachments.return_text` | restituisci nella risposta il testo letto dai documenti |
+| `attachments.max_text_chars` | quanto testo restituire per documento (`0` = tutto) |
+| `ocr.always_call` | `true` manda all'OCR anche i PDF che hanno gia' il testo |
+| `ocr.resize_oversized_images` | ridimensiona le immagini oltre `ocr.max_file_bytes` invece di saltarle |
 | `local_files.enabled` | leggi gli allegati indicati per percorso (campo `attchment`) |
 | `local_files.allowed_directories` | cartelle da cui e' lecito leggere: da riempire se il servizio e' raggiungibile in rete |
 | `local_files.search_directories` | dove cercare il file per nome se il percorso non esiste |
@@ -249,14 +271,32 @@ nelle cartelle di `local_files.search_directories`.
     {
       "nome": "impegnativa.pdf",
       "origine": "allegato",
-      "sorgente": "pdf_text",
+      "sorgente": "pdf_text+ocr",
       "caratteri": 512,
       "conforme": true,
       "trovati": ["telemedicina", "1501A"],
       "mancanti": [],
-      "errore": null
+      "nota": null,
+      "errore": null,
+      "testo": "ASL SALERNO - RICHIESTA DI TELEMEDICINA\nprestazione 1501A ...",
+      "testo_troncato": false
+    },
+    {
+      "nome": "foto.png",
+      "origine": "allegato",
+      "sorgente": "ocr",
+      "caratteri": 42,
+      "conforme": false,
+      "trovati": ["telemedicina"],
+      "mancanti": ["1501A"],
+      "nota": "immagine ridotta da 2400x1800 (3717838 byte) a lato lungo 2000 (316504 byte) per il limite dell'OCR",
+      "errore": null,
+      "testo": "TELEVISITA CARDIOLOGIA - piano terapeutico",
+      "testo_troncato": false
     }
   ],
+  "documenti_letti": 2,
+  "documenti_conformi": 1,
   "sentiment": {
     "punteggio": 1.0,
     "etichetta": "positivo",
@@ -284,6 +324,27 @@ Valori possibili di `esito`:
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
+
+### I documenti letti
+
+`documenti` elenca **tutti** gli allegati e le foto analizzati, in ordine di
+arrivo: il servizio non si ferma al primo utile.
+
+| Campo | Significato |
+|---|---|
+| `sorgente` | `pdf_text+ocr` livello di testo del PDF unito alla lettura OCR; `ocr` solo OCR; `pdf_text` solo livello di testo (con `ocr.always_call: false`); `skipped` non leggibile; `error` lettura fallita |
+| `testo` | il testo letto, troncato a `attachments.max_text_chars`. Si esclude con `attachments.return_text: false` |
+| `nota` | cosa e' stato fatto al file prima di leggerlo, oggi il ridimensionamento di un'immagine troppo grande |
+| `conforme` | questo singolo documento contiene **tutti** i criteri |
+
+`criteri` riassume invece l'intero messaggio: `trovati` e' l'unione di quanto
+letto in tutti i documenti, `mancanti` elenca solo cio' che non compare in
+nessuno. `soddisfatti` resta vero soltanto se **un singolo** documento contiene
+tutti i criteri: l'impegnativa e' un foglio solo, e trovare "telemedicina" in un
+file e "1501A" in un altro non equivale ad averla.
+
+`documenti_letti` e `documenti_conformi` sono i due conteggi che servono al
+flusso per decidere senza scorrere l'elenco.
 
 ### Le percentuali di sicurezza
 
@@ -470,7 +531,8 @@ src/inoltro_email/
 │   └── server.py      avvio con uvicorn
 └── ocr/
     ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
-    └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
+    ├── images.py      riduzione delle immagini troppo grandi per l'API
+    └── extractor.py   lettura di un documento: livello di testo del PDF + OCR
 ```
 
 `analysis.py` non conosce HTTP e `api/app.py` non conosce l'OCR: la logica e'

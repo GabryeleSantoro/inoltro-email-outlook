@@ -1,13 +1,21 @@
 """Estrazione del testo da un allegato.
 
-Decide *come* leggere il file prima ancora di chiamare l'OCR:
+Ogni allegato leggibile viene mandato a ocr.space: il testo che ne esce serve
+a verificare i criteri e concorre alle percentuali di sicurezza, quindi non si
+rinuncia a nessuna fonte.
 
-1. PDF gia' provvisto di livello di testo -> lo legge con ``pypdf``, senza
-   consumare quota ne' tempo di rete;
-2. PDF scansionato -> lo manda a ocr.space, spezzandolo in blocchi di pagine
-   quando supera i limiti del piano (dimensione o numero di pagine);
-3. immagine -> la manda direttamente a ocr.space;
-4. tutto il resto -> saltato, con il motivo tracciato nel risultato.
+1. PDF con livello di testo -> lo legge con ``pypdf`` **e** lo manda comunque
+   all'OCR, unendo i due testi. Il livello di testo e' esatto dove c'e', l'OCR
+   recupera cio' che il PDF ha solo come immagine (timbri, firme, moduli
+   scansionati incollati dentro un PDF nativo);
+2. PDF scansionato -> a ocr.space, spezzato in blocchi di pagine quando supera
+   i limiti del piano (dimensione o numero di pagine);
+3. immagine -> a ocr.space; se supera il limite di dimensione viene
+   **ridimensionata** invece che saltata (vedi ``images.py``);
+4. formato non leggibile -> saltato, con il motivo tracciato nel risultato.
+
+Chi vuole risparmiare quota puo' rimettere ``ocr.always_call`` a
+false: il PDF con il proprio livello di testo non verra' piu' mandato all'OCR.
 """
 
 from __future__ import annotations
@@ -19,6 +27,7 @@ from typing import List
 
 from ..config import Settings
 from ..models import AttachmentFile, ExtractedText, TextSource
+from .images import ImageError, riduci_sotto
 from .ocrspace import OcrSpaceClient, OcrSpaceError
 
 logger = logging.getLogger(__name__)
@@ -63,28 +72,55 @@ class TextExtractor:
 
     def _extract_pdf(self, attachment: AttachmentFile) -> ExtractedText:
         embedded = self._read_pdf_text_layer(attachment.path)
-        if len(embedded.strip()) >= MIN_PDF_TEXT_CHARS:
+        ha_testo = len(embedded.strip()) >= MIN_PDF_TEXT_CHARS
+
+        if ha_testo and not self._settings.ocr.always_call:
             logger.info(
-                "%s: testo letto dal livello di testo del PDF (%d caratteri), OCR non necessario.",
+                "%s: testo letto dal livello di testo del PDF (%d caratteri), OCR non richiesto.",
                 attachment.original_name, len(embedded),
             )
             return ExtractedText(attachment, embedded, TextSource.PDF_TEXT)
 
-        logger.info("%s: PDF senza testo utile, invio a ocr.space.", attachment.original_name)
+        try:
+            letto_dall_ocr = self._ocr_pdf(attachment)
+        except OcrSpaceError:
+            if not ha_testo:
+                raise
+            # L'OCR non ha funzionato ma il PDF il suo testo ce l'ha: si usa
+            # quello invece di far fallire l'analisi del documento.
+            logger.warning(
+                "%s: OCR non riuscito, si usa il solo livello di testo del PDF.",
+                attachment.original_name,
+            )
+            return ExtractedText(attachment, embedded, TextSource.PDF_TEXT)
+
+        if not ha_testo:
+            return ExtractedText(attachment, letto_dall_ocr, TextSource.OCR)
+
+        logger.info(
+            "%s: uniti livello di testo del PDF (%d caratteri) e lettura OCR (%d caratteri).",
+            attachment.original_name, len(embedded), len(letto_dall_ocr),
+        )
+        return ExtractedText(
+            attachment, f"{embedded}\n{letto_dall_ocr}", TextSource.PDF_TEXT_OCR
+        )
+
+    def _ocr_pdf(self, attachment: AttachmentFile) -> str:
+        """Manda il PDF a ocr.space, a blocchi se supera i limiti del piano."""
         limits = self._settings.ocr
         page_count = self._count_pdf_pages(attachment.path)
         too_many_pages = page_count > limits.max_pdf_pages_per_request
         too_big = attachment.size_bytes > limits.max_file_bytes
 
         if not too_many_pages and not too_big:
-            return ExtractedText(attachment, self._ocr.parse_file(attachment.path).text, TextSource.OCR)
+            return self._ocr.parse_file(attachment.path).text
 
         logger.info(
             "%s: %d pagine / %d byte oltre i limiti dell'API, invio a blocchi di %d pagine.",
             attachment.original_name, page_count, attachment.size_bytes,
             limits.max_pdf_pages_per_request,
         )
-        return ExtractedText(attachment, self._ocr_pdf_in_chunks(attachment), TextSource.OCR)
+        return self._ocr_pdf_in_chunks(attachment)
 
     def _ocr_pdf_in_chunks(self, attachment: AttachmentFile) -> str:
         """Spezza il PDF in blocchi di pagine e concatena i testi riconosciuti."""
@@ -156,13 +192,30 @@ class TextExtractor:
     # --------------------------------------------------------------- immagini
 
     def _extract_image(self, attachment: AttachmentFile) -> ExtractedText:
-        if attachment.size_bytes > self._settings.ocr.max_file_bytes:
-            return self._skip(
-                attachment,
-                f"immagine di {attachment.size_bytes} byte oltre il limite di "
-                f"{self._settings.ocr.max_file_bytes} byte accettato da ocr.space",
+        limite = self._settings.ocr.max_file_bytes
+        if attachment.size_bytes <= limite or not self._settings.ocr.resize_oversized_images:
+            if attachment.size_bytes > limite:
+                return self._skip(
+                    attachment,
+                    f"immagine di {attachment.size_bytes} byte oltre il limite di "
+                    f"{limite} byte accettato da ocr.space "
+                    "(ridimensionamento disattivato)",
+                )
+            return ExtractedText(
+                attachment, self._ocr.parse_file(attachment.path).text, TextSource.OCR
             )
-        return ExtractedText(attachment, self._ocr.parse_file(attachment.path).text, TextSource.OCR)
+
+        # Una foto di impegnativa scattata col telefono supera sempre il MB:
+        # si rimpicciolisce quanto basta invece di rinunciare a leggerla.
+        with tempfile.TemporaryDirectory(prefix="inoltro-img-") as tmp_dir:
+            lavoro = Path(tmp_dir) / attachment.path.stem
+            try:
+                ridotta, nota = riduci_sotto(attachment.path, limite, lavoro)
+            except ImageError as exc:
+                return self._skip(attachment, f"immagine troppo grande e non riducibile: {exc}")
+            testo = self._ocr.parse_file(ridotta).text
+
+        return ExtractedText(attachment, testo, TextSource.OCR, note=nota)
 
     # ----------------------------------------------------------------- utili
 

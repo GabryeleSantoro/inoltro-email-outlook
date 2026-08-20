@@ -141,7 +141,14 @@ def _cmd_analizza(settings: Settings, path: Optional[Path]) -> int:
         analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr_client))
         analysis = analyzer.analyze(email)
 
-    print(json.dumps(analysis_to_dict(analysis), indent=2, ensure_ascii=False))
+    print(json.dumps(
+        analysis_to_dict(
+            analysis,
+            include_text=settings.attachments.return_text,
+            max_text_chars=settings.attachments.max_text_chars,
+        ),
+        indent=2, ensure_ascii=False,
+    ))
     # L'esito e' nel JSON: il codice di uscita segnala solo se l'analisi si e'
     # interrotta, non se l'email era conforme.
     return 1 if analysis.esito is Esito.ERRORE else 0
