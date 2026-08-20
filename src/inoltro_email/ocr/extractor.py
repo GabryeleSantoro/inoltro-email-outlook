@@ -1,21 +1,22 @@
 """Estrazione del testo da un allegato.
 
-Ogni allegato leggibile viene mandato a ocr.space: il testo che ne esce serve
-a verificare i criteri e concorre alle percentuali di sicurezza, quindi non si
-rinuncia a nessuna fonte.
+Si legge sempre il modo piu' diretto per primo, e si va all'OCR solo quando
+serve davvero:
 
-1. PDF con livello di testo -> lo legge con ``pypdf`` **e** lo manda comunque
-   all'OCR, unendo i due testi. Il livello di testo e' esatto dove c'e', l'OCR
-   recupera cio' che il PDF ha solo come immagine (timbri, firme, moduli
-   scansionati incollati dentro un PDF nativo);
-2. PDF scansionato -> a ocr.space, spezzato in blocchi di pagine quando supera
-   i limiti del piano (dimensione o numero di pagine);
-3. immagine -> a ocr.space; se supera il limite di dimensione viene
+1. **PDF** -> si prova a leggerlo con ``pypdf``. Se il livello di testo c'e' ed
+   e' utilizzabile, quello e' il testo del documento: esatto, immediato e senza
+   consumare quota. All'OCR ci si va solo quando la lettura non riesce (PDF
+   cifrato, malformato) o non produce testo utile perche' il PDF e' una
+   scansione. Il PDF che finisce all'OCR viene spezzato in blocchi di pagine se
+   supera i limiti del piano;
+2. **immagine** -> a ocr.space; se supera il limite di dimensione viene
    **ridimensionata** invece che saltata (vedi ``images.py``);
-4. formato non leggibile -> saltato, con il motivo tracciato nel risultato.
+3. **tutto il resto** -> non arriva nemmeno qui: fogli di calcolo, documenti
+   Word e GIF sono esclusi a monte (vedi ``config.FORMATI_SUPPORTATI``).
 
-Chi vuole risparmiare quota puo' rimettere ``ocr.always_call`` a
-false: il PDF con il proprio livello di testo non verra' piu' mandato all'OCR.
+Con ``ocr.always_call: true`` anche i PDF gia' leggibili passano dall'OCR e i
+due testi vengono uniti: piu' dati - dentro un PDF nativo puo' esserci una
+scansione incollata - al prezzo di una chiamata per ogni documento.
 """
 
 from __future__ import annotations
@@ -76,10 +77,16 @@ class TextExtractor:
 
         if ha_testo and not self._settings.ocr.always_call:
             logger.info(
-                "%s: testo letto dal livello di testo del PDF (%d caratteri), OCR non richiesto.",
+                "%s: letto direttamente dal PDF (%d caratteri), nessuna chiamata all'OCR.",
                 attachment.original_name, len(embedded),
             )
             return ExtractedText(attachment, embedded, TextSource.PDF_TEXT)
+
+        if not ha_testo:
+            logger.info(
+                "%s: il PDF non ha un livello di testo utilizzabile, si passa all'OCR.",
+                attachment.original_name,
+            )
 
         try:
             letto_dall_ocr = self._ocr_pdf(attachment)

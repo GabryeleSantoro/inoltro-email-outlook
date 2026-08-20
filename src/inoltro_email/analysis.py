@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .config import Settings
+from .config import FORMATI_SUPPORTATI, Settings
 from .confidence import score_booking, score_telemedicine
 from .matching import evaluate, screen
 from .models import (
@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _BODY_PREVIEW_CHARS = 4000
+# Quanto testo dell'OCR finisce nei log. Un referto di venti pagine non serve
+# per intero: il criterio cercato sta sempre nelle prime righe.
+_TEXT_LOG_CHARS = 4000
 
 
 def _clip(text: str, limit: int) -> str:
@@ -80,8 +83,12 @@ class EmailAnalyzer:
             ", ".join(screening.terms) or "-",
         )
 
+        # Gli allegati che si sanno leggere: sono gli unici che contano, sia
+        # per l'OCR sia per le percentuali.
+        leggibili = self._select(email.attachments)
+
         # Prima stima, senza OCR: serve a decidere se spendere una chiamata.
-        preliminary = self._telemedicine_confidence(email)
+        preliminary = self._telemedicine_confidence(email, attachments=leggibili)
         logger.info(
             "Sicurezza telemedicina di '%s' prima dell'OCR: %s [%s]",
             subject, preliminary.summary(), _describe(preliminary),
@@ -99,7 +106,7 @@ class EmailAnalyzer:
             )
 
         try:
-            analyses, match, matched_name, text_read = self._read_documents(email)
+            analyses, match, matched_name, text_read = self._read_documents(email, leggibili)
         except Exception as exc:  # noqa: BLE001 - il servizio deve rispondere comunque
             logger.exception("Analisi non riuscita per '%s'", subject)
             return self._result(
@@ -118,8 +125,8 @@ class EmailAnalyzer:
         # tutti quanti, non solo nel primo utile.
         conformi = sum(1 for item in analyses if item.matched)
         telemedicina = self._telemedicine_confidence(
-            email, document_text=text_read, document_matched=conforme,
-            documents_matched=conformi,
+            email, attachments=leggibili, document_text=text_read,
+            document_matched=conforme, documents_matched=conformi,
         )
         prenotazione = self._booking_confidence(
             email, telemedicina, document_text=text_read, document_matched=conforme,
@@ -202,14 +209,13 @@ class EmailAnalyzer:
     # ------------------------------------------------------ allegati e foto
 
     def _read_documents(
-        self, email: InboundEmail
+        self, email: InboundEmail, candidates: List[InboundAttachment]
     ) -> Tuple[List[AttachmentAnalysis], Optional[MatchReport], Optional[str], str]:
         """Legge allegati e foto del corpo finche' non trova un documento conforme.
 
         Restituisce anche il testo complessivamente letto: entra nel calcolo
         della sicurezza, non solo nella verifica dei criteri.
         """
-        candidates = self._select(email.attachments)
         if not candidates:
             logger.info("Nessun allegato o foto analizzabile in '%s'.", email.subject)
             return [], None, None, ""
@@ -234,7 +240,15 @@ class EmailAnalyzer:
                         len(extracted.text), report.summary(),
                         "conforme" if report.matched else "non conforme",
                     )
-                    logger.debug("Testo letto da '%s':\n%s", item.name, extracted.text)
+                    # Il testo letto va nei log: senza, davanti a un documento
+                    # dato per non conforme non si capisce se il criterio
+                    # manca davvero o se l'OCR ha letto male.
+                    logger.info(
+                        "Testo letto da '%s' (%s):\n%s",
+                        item.name, extracted.source.value,
+                        _clip(extracted.text, _TEXT_LOG_CHARS),
+                    )
+                    logger.debug("Testo completo di '%s':\n%s", item.name, extracted.text)
                 else:
                     logger.info(
                         "%s '%s': nessun testo letto (%s).",
@@ -264,15 +278,29 @@ class EmailAnalyzer:
         return analyses, _aggregate(analyses), matched_name, "\n".join(texts)
 
     def _select(self, attachments: List[InboundAttachment]) -> List[InboundAttachment]:
-        """Scarta cio' che non si sa leggere e limita il numero di chiamate OCR."""
+        """Gli allegati da analizzare: solo PDF e immagini, entro i limiti.
+
+        Cio' che non passa di qui non viene letto e non entra in nessun
+        conteggio: ne' fra i documenti della risposta, ne' fra gli indizi che
+        formano le percentuali. Un foglio di calcolo chiamato "ACCESSI IN
+        TELEMEDICINA.xlsx" non deve spostare di un punto la sicurezza del
+        servizio, visto che il suo contenuto resta illeggibile.
+        """
         limits = self._settings.attachments
         selected: List[InboundAttachment] = []
 
         for item in attachments:
             if item.origine is Origine.CORPO and not limits.include_inline_images:
                 continue
+            if item.extension not in FORMATI_SUPPORTATI:
+                logger.info(
+                    "'%s' escluso: il servizio legge solo PDF e immagini.", item.name
+                )
+                continue
             if item.extension not in limits.allowed_extensions:
-                logger.debug("'%s' ignorato: estensione non ammessa.", item.name)
+                logger.info(
+                    "'%s' escluso: estensione non ammessa dalla configurazione.", item.name
+                )
                 continue
             if item.size_bytes > limits.max_bytes:
                 logger.info("'%s' ignorato: %d byte oltre il limite.", item.name, item.size_bytes)
@@ -304,6 +332,7 @@ class EmailAnalyzer:
         self,
         email: InboundEmail,
         *,
+        attachments: Optional[List[InboundAttachment]] = None,
         document_text: str = "",
         document_matched: bool = False,
         documents_matched: int = 0,
@@ -312,7 +341,7 @@ class EmailAnalyzer:
             email.subject,
             email.body_text,
             self._settings.confidence,
-            attachment_names=[item.name for item in email.attachments],
+            attachment_names=[item.name for item in (attachments or [])],
             document_text=document_text,
             document_matched=document_matched,
             documents_matched=documents_matched,
@@ -339,8 +368,8 @@ class EmailAnalyzer:
 
     # ----------------------------------------------------------------- utili
 
-    @staticmethod
     def _result(
+        self,
         email: InboundEmail,
         esito: Esito,
         screening: ScreeningReport,
@@ -368,6 +397,21 @@ class EmailAnalyzer:
             error=error,
             warnings=list(email.warnings),
             duration_ms=int((time.monotonic() - started) * 1000),
+            prenotazione_certa=self._certa(telemedicina, prenotazione),
+        )
+
+    def _certa(
+        self, telemedicina: ConfidenceScore, prenotazione: ConfidenceScore
+    ) -> bool:
+        """La prenotazione e' certa, non solo probabile.
+
+        Serve il tema confermato *e* una prenotazione sopra la soglia di
+        certezza: e' il grado di sicurezza a cui il flusso puo' agire senza che
+        una persona guardi il messaggio.
+        """
+        return (
+            telemedicina.holds
+            and prenotazione.percent >= self._settings.confidence.certainty_threshold
         )
 
 

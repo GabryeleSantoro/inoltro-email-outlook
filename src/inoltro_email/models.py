@@ -301,6 +301,10 @@ class EmailAnalysis:
     error: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
     duration_ms: int = 0
+    # La prenotazione e' oltre la soglia di certezza (confidence.
+    # certainty_threshold), non solo oltre quella di conferma. E' cio' che
+    # decide il codice di stato HTTP della risposta.
+    prenotazione_certa: bool = False
 
     @property
     def conforme(self) -> bool:

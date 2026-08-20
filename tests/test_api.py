@@ -357,3 +357,69 @@ def test_tutti_gli_allegati_arrivano_all_ocr(settings: Settings) -> None:
     assert corpo["documenti_letti"] == 3
     assert corpo["documenti_conformi"] == 1
     assert [d["nome"] for d in corpo["documenti"]] == ["primo.pdf", "secondo.pdf", "terzo.pdf"]
+
+
+# ------------------------------------------------- codice di stato della risposta
+
+
+def test_duecento_solo_per_una_prenotazione_certa(client: TestClient) -> None:
+    risposta = client.post("/analizza-email", json=email_payload(
+        subject="Richiesta prenotazione televisita",
+        body="Vorrei prenotare una televisita. Allego l'impegnativa.",
+        attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())],
+    ))
+
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert corpo["prenotazione_certa"] is True
+    assert corpo["prenotazione"]["percentuale"] >= 80
+
+
+def test_duecentodue_quando_non_e_una_prenotazione(client: TestClient) -> None:
+    """Non e' un errore: e' un esito legittimo, con il verdetto nel corpo."""
+    risposta = client.post("/analizza-email", json=email_payload(
+        subject="Accessi Telemedicina Luglio 2026",
+        body="In allegato gli accessi in Telemedicina del mese.",
+    ))
+
+    assert risposta.status_code == 202
+    corpo = risposta.json()
+    assert corpo["prenotazione_certa"] is False
+    assert corpo["telemedicina"]["percentuale"] > 0  # il verdetto c'e' comunque
+
+
+def test_duecentodue_quando_la_prenotazione_e_solo_probabile(client: TestClient) -> None:
+    """Sopra la soglia di conferma ma sotto quella di certezza: la guarda una persona."""
+    risposta = client.post("/analizza-email", json=email_payload(
+        subject="Rinnovo piano terapeutico",
+        body="Si chiede appuntamento di televisita per il rinnovo del piano terapeutico.",
+    ))
+
+    corpo = risposta.json()
+    assert corpo["prenotazione"]["confermato"] is True
+    assert corpo["prenotazione_certa"] is False
+    assert risposta.status_code == 202
+
+
+def test_la_soglia_di_certezza_e_configurabile(
+    settings: Settings, ocr: FakeOcrClient
+) -> None:
+    settings.confidence.certainty_threshold = 60.0
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        risposta = instance.post("/analizza-email", json=email_payload(
+            subject="Rinnovo piano terapeutico",
+            body="Si chiede appuntamento di televisita per il rinnovo del piano terapeutico.",
+        ))
+
+    assert risposta.status_code == 200
+    assert risposta.json()["prenotazione_certa"] is True
+
+
+def test_gli_errori_restano_errori(client: TestClient) -> None:
+    """Il 202 vale per le analisi riuscite, non copre i payload rotti."""
+    risposta = client.post(
+        "/analizza-email", content=b"{non json", headers={"content-type": "application/json"}
+    )
+
+    assert risposta.status_code == 400

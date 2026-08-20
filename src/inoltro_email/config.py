@@ -14,6 +14,7 @@ dove si preferisce configurare tutto da variabili d'ambiente).
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,13 +23,23 @@ from typing import Any, Dict, List, Optional
 import yaml
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 OCR_API_KEY_ENV = "OCR_SPACE_API_KEY"
 SERVICE_API_KEY_ENV = "SERVICE_API_KEY"
 HOST_ENV = "API_HOST"
 PORT_ENV = "PORT"
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
-DEFAULT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
+
+# Formati che il servizio sa leggere: documenti PDF e immagini. Tutto il resto
+# (fogli di calcolo, documenti Word, archivi) non viene nemmeno aperto: non c'e'
+# modo di ricavarne testo con l'OCR e finirebbe solo per consumare quota.
+#
+# Le GIF sono escluse pur essendo immagini: ocr.space le rifiuta, e in una email
+# aziendale una GIF e' quasi sempre un logo animato della firma.
+FORMATI_SUPPORTATI = frozenset({".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"})
+DEFAULT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
 
 
 class ConfigError(Exception):
@@ -86,10 +97,11 @@ class OcrSettings:
     max_retries: int = 3
     max_file_bytes: int = 1_048_576
     max_pdf_pages_per_request: int = 3
-    # true = ogni documento leggibile passa dall'OCR, anche un PDF che ha gia'
-    # il proprio livello di testo: i due testi vengono uniti. false = il PDF
-    # con il testo non viene mandato all'OCR (meno quota, meno dati).
-    always_call: bool = True
+    # false (predefinito) = un PDF che ha il proprio livello di testo viene
+    # letto in locale e non passa dall'OCR; ci si va solo se la lettura non
+    # riesce o non produce testo utile. true = il PDF passa comunque dall'OCR e
+    # i due testi vengono uniti (piu' dati, molta piu' quota consumata).
+    always_call: bool = False
     # true = un'immagine oltre max_file_bytes viene ridimensionata invece che
     # saltata. Una foto di impegnativa supera sempre il MB del piano gratuito.
     resize_oversized_images: bool = True
@@ -145,6 +157,10 @@ class ConfidenceSettings:
     # nomi dei file) non si spende una chiamata all'OCR. Zero = si legge
     # sempre tutto, che e' l'impostazione predefinita.
     min_percent_for_ocr: float = 0.0
+    # Sopra questa percentuale la prenotazione e' considerata *certa* ed e' cio'
+    # che fa rispondere 200 invece di 202. Deve stare sopra booking_threshold:
+    # "confermata" e "certa" sono due gradi diversi di sicurezza.
+    certainty_threshold: float = 80.0
     # Termini costanti dei due punteggi: piu' sono negativi, piu' servono
     # indizi per arrivare a una percentuale alta.
     telemedicine_bias: float = -2.2
@@ -279,10 +295,9 @@ class Settings:
             ),
         )
         attachments = AttachmentSettings(
-            allowed_extensions=[
-                _normalize_extension(ext)
-                for ext in _as_str_list(att_raw.get("allowed_extensions"), DEFAULT_EXTENSIONS)
-            ],
+            allowed_extensions=_supported_only(
+                _as_str_list(att_raw.get("allowed_extensions"), DEFAULT_EXTENSIONS)
+            ),
             max_bytes=int(att_raw.get("max_bytes", AttachmentSettings.max_bytes)),
             include_inline_images=bool(att_raw.get("include_inline_images", True)),
             max_files=int(att_raw.get("max_files", AttachmentSettings.max_files)),
@@ -310,6 +325,9 @@ class Settings:
             ),
             min_percent_for_ocr=float(
                 confidence_raw.get("min_percent_for_ocr", ConfidenceSettings.min_percent_for_ocr)
+            ),
+            certainty_threshold=float(
+                confidence_raw.get("certainty_threshold", ConfidenceSettings.certainty_threshold)
             ),
             telemedicine_bias=float(
                 confidence_raw.get("telemedicine_bias", ConfidenceSettings.telemedicine_bias)
@@ -383,9 +401,15 @@ class Settings:
             ("telemedicine_threshold", self.confidence.telemedicine_threshold),
             ("booking_threshold", self.confidence.booking_threshold),
             ("min_percent_for_ocr", self.confidence.min_percent_for_ocr),
+            ("certainty_threshold", self.confidence.certainty_threshold),
         ):
             if not 0.0 <= value <= 100.0:
                 raise ConfigError(f"confidence.{name} deve stare fra 0 e 100.")
+        if self.confidence.certainty_threshold < self.confidence.booking_threshold:
+            raise ConfigError(
+                "confidence.certainty_threshold deve essere >= confidence.booking_threshold: "
+                "una prenotazione certa non puo' essere meno sicura di una confermata."
+            )
         for directory in self.local_files.allowed_directories + self.local_files.search_directories:
             if not str(directory).strip():
                 raise ConfigError("I percorsi in 'local_files' non possono essere vuoti.")
@@ -429,3 +453,30 @@ def _clean(values: List[str]) -> List[str]:
 def _normalize_extension(ext: str) -> str:
     ext = ext.strip().lower()
     return ext if ext.startswith(".") else f".{ext}"
+
+
+def _supported_only(extensions: List[str]) -> List[str]:
+    """Tiene solo i formati che il servizio sa davvero leggere.
+
+    La configurazione puo' restringere l'elenco, non allargarlo: se qualcuno
+    rimette ``.gif`` o ``.xlsx`` fra le estensioni ammesse, l'indicazione viene
+    scartata e segnalata nei log invece di produrre chiamate all'OCR destinate
+    a fallire.
+    """
+    ammesse: List[str] = []
+    rifiutate: List[str] = []
+    for ext in extensions:
+        normalizzata = _normalize_extension(ext)
+        if normalizzata in FORMATI_SUPPORTATI:
+            if normalizzata not in ammesse:
+                ammesse.append(normalizzata)
+        elif normalizzata not in rifiutate:
+            rifiutate.append(normalizzata)
+
+    if rifiutate:
+        logger.warning(
+            "Estensioni non supportate ignorate in attachments.allowed_extensions: %s. "
+            "Il servizio legge solo PDF e immagini (%s).",
+            ", ".join(rifiutate), ", ".join(sorted(FORMATI_SUPPORTATI)),
+        )
+    return ammesse or list(DEFAULT_EXTENSIONS)

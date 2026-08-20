@@ -38,6 +38,21 @@ API_KEY_HEADER = "X-API-Key"
 # 413: il nome della costante e' cambiato fra le versioni di Starlette.
 RICHIESTA_TROPPO_GRANDE = 413
 
+# Codici con cui il servizio risponde a un'analisi riuscita.
+#
+# 200 = e' una prenotazione di telemedicina, con la sicurezza necessaria per
+#       agire senza che una persona guardi il messaggio;
+# 202 = messaggio analizzato correttamente, ma non e' una prenotazione (o non
+#       lo e' abbastanza da esserne certi).
+#
+# Sono due codici 2xx apposta. Power Automate considera *fallita* l'azione HTTP
+# davanti a un 4xx: il flusso finirebbe in errore e, con i tentativi automatici
+# attivi, rianalizzerebbe lo stesso messaggio consumando altra quota OCR. "Non
+# e' una prenotazione" e' un esito legittimo dell'analisi, non un errore della
+# richiesta. Entrambe le risposte portano il verdetto completo nel corpo.
+ANALISI_CERTA = 200
+ANALISI_SENZA_PRENOTAZIONE = 202
+
 # Il flusso in produzione manda gli allegati come percorsi su disco: la forma
 # e' diversa da quella del connettore Outlook, il servizio le accetta entrambe.
 RICHIESTA_ESEMPIO_PERCORSI = {
@@ -129,9 +144,10 @@ def create_app(
         version=__version__,
         description=(
             "Analizza una singola email inoltrata da Power Automate: verifica "
-            "telemedicina/televisita in oggetto e corpo, legge allegati e foto "
-            "con l'OCR cercando i criteri configurati e calcola il punteggio di "
-            "sentiment e di intento di prenotazione."
+            "telemedicina/televisita in oggetto e corpo, legge PDF e immagini "
+            "cercando i criteri configurati e calcola le percentuali di "
+            "sicurezza. Risponde 200 quando e' certamente una prenotazione di "
+            "telemedicina, 202 in tutti gli altri casi analizzati."
         ),
         lifespan=lifespan,
     )
@@ -177,6 +193,17 @@ def create_app(
         "/analizza-email",
         tags=["analisi"],
         summary="Analizza una singola email letta da Power Automate",
+        responses={
+            ANALISI_CERTA: {
+                "description": "E' una prenotazione di telemedicina: sicurezza "
+                               "oltre la soglia di certezza configurata.",
+            },
+            ANALISI_SENZA_PRENOTAZIONE: {
+                "description": "Messaggio analizzato: non e' una prenotazione di "
+                               "telemedicina, o non lo e' con sicurezza sufficiente. "
+                               "Il verdetto completo e' nel corpo della risposta.",
+            },
+        },
         openapi_extra={
             "requestBody": {
                 "required": True,
@@ -228,12 +255,21 @@ def create_app(
             len(email.attachments),
         )
         analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+
+        stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
+        logger.info(
+            "Risposta %d per '%s': telemedicina %s, prenotazione %s (soglia di certezza %.0f%%).",
+            stato, email.subject or "(senza oggetto)",
+            analysis.telemedicina.summary(), analysis.prenotazione.summary(),
+            settings.confidence.certainty_threshold,
+        )
         return JSONResponse(
             analysis_to_dict(
                 analysis,
                 include_text=settings.attachments.return_text,
                 max_text_chars=settings.attachments.max_text_chars,
-            )
+            ),
+            status_code=stato,
         )
 
     @app.exception_handler(HTTPException)

@@ -36,6 +36,8 @@ def analysis_to_dict(
         # Verdetto sintetico: e' una prenotazione di telemedicina? Vale solo se
         # entrambe le percentuali superano la rispettiva soglia.
         "prenotazione_telemedicina": analysis.e_prenotazione_telemedicina,
+        # Vero solo oltre la soglia di certezza: e' cio' che fa rispondere 200.
+        "prenotazione_certa": analysis.prenotazione_certa,
         "telemedicina": confidence_to_dict(analysis.telemedicina),
         "prenotazione": confidence_to_dict(analysis.prenotazione),
         "screening": {
