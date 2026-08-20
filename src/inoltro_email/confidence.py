@@ -34,41 +34,64 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .config import ConfidenceSettings
 from .matching import normalize
 from .models import ConfidenceScore, Evidence
+from .spelling import trova_termini
 
 # --------------------------------------------------------------- espressioni
 
 # Prestazioni erogate a distanza: il nucleo del tema "telemedicina".
+# Il terzo elemento elenca i termini che ``spelling`` sa riconoscere anche
+# scritti male: si usano solo quando l'espressione regolare non trova nulla.
 TELEMEDICINE_TERMS = (
-    (r"\btelemedicin\w*", "telemedicina"),
-    (r"\btelevisit\w*", "televisita"),
-    (r"\bteleconsult\w*", "teleconsulto"),
-    (r"\btelemonitorag\w*|\btelemonitor\w*", "telemonitoraggio"),
-    (r"\bteleassistenz\w*", "teleassistenza"),
-    (r"\bterefertaz\w*|\bteleref\w*", "telerefertazione"),
-    (r"\bvideovisit\w*|\bvisita a distanza\b|\bvisita da remoto\b", "visita a distanza"),
+    (r"\btelemedicin\w*", "telemedicina", ("telemedicina",)),
+    (r"\btelevisit\w*", "televisita", ("televisita",)),
+    (r"\bteleconsult\w*", "teleconsulto", ("teleconsulto",)),
+    (r"\btelemonitorag\w*|\btelemonitor\w*", "telemonitoraggio", ("telemonitoraggio",)),
+    (r"\bteleassistenz\w*", "teleassistenza", ("teleassistenza",)),
+    (r"\bterefertaz\w*|\bteleref\w*", "telerefertazione", ()),
+    (r"\bvideovisit\w*|\bvisita a distanza\b|\bvisita da remoto\b",
+     "visita a distanza", ("videovisita",)),
 )
 
-# Indizi di una prenotazione vera e propria.
+# Indizi di una prenotazione vera e propria: (regola, etichetta, peso
+# nell'oggetto, peso nel corpo, termini riconosciuti anche se scritti male).
+#
+# "televisita" e "telemedicina" compaiono anche qui, oltre che fra i termini
+# del tema: nominare la prestazione mentre si chiede un appuntamento e' un
+# indizio in piu'. I pesi sono pero' bassi apposta, perche' il tema entra gia'
+# nel punteggio per conto suo e non deve contare due volte per intero.
 BOOKING_TERMS = (
-    (r"\bprenot\w*", "prenotazione", 2.4, 1.6),
-    (r"\bappuntament\w*", "appuntamento", 1.6, 1.1),
-    (r"\bimpegnativ\w*|\bricett\w*|\bprescrizion\w*", "impegnativa", 1.2, 1.2),
+    (r"\bprenot\w*", "prenotazione", 2.4, 1.6, ("prenotazione",)),
+    (r"\bappuntament\w*", "appuntamento", 1.6, 1.1, ("appuntamento",)),
+    (r"\bimpegnativ\w*|\bricett\w*|\bprescrizion\w*", "impegnativa", 1.3, 1.2,
+     ("impegnativa", "ricetta", "prescrizione")),
+    (r"\bpian\w+ terapeutic\w+", "piano terapeutico", 1.0, 0.8, ("terapeutico",)),
+    (r"\bvisit\w*", "visita", 1.2, 0.7, ("visita",)),
+    (r"\btelevisit\w*", "televisita", 1.6, 0.9, ("televisita",)),
+    (r"\btelemedicin\w*", "telemedicina", 1.2, 0.7, ("telemedicina",)),
     (r"\bcodice prenotazione\b|\bnumero appuntamento\b|\bnumero ricetta\b",
-     "riferimenti della prenotazione", 1.3, 1.3),
-    (r"\bfissare\b|\bfissiamo\b|\bcalendarizzare\b", "fissare un appuntamento", 1.0, 0.9),
+     "riferimenti della prenotazione", 1.3, 1.3, ()),
+    (r"\bfissare\b|\bfissiamo\b|\bcalendarizzare\b", "fissare un appuntamento", 1.0, 0.9, ()),
     (r"\bdisponibilit\w*|\bprimo posto utile\b|\bprima data utile\b",
-     "richiesta di disponibilita", 0.7, 0.6),
-    (r"\bvorrei\b|\bchiedo\b|\brichiedo\b|\bpotrei\b|\bnecessito\b",
-     "richiesta esplicita", 0.4, 0.4),
+     "richiesta di disponibilita", 0.7, 0.6, ()),
+    (r"\bvorrei\b|\bchiedo\b|\brichiedo\b|\brichiest\w*|\bpotrei\b|\bnecessito\b",
+     "richiesta esplicita", 0.4, 0.4, ()),
     (r"\bpaziente\b|\bassistit\w*|\bcodice fiscale\b|\btessera sanitaria\b",
-     "dati del paziente", 0.4, 0.4),
-    (r"\b1501a\b", "codice 1501A", 1.2, 1.2),
+     "dati del paziente", 0.4, 0.4, ()),
+    (r"\b1501a\b", "codice 1501A", 1.2, 1.2, ()),
 )
+
+# Peso di un termine del tema secondo il punto del messaggio in cui compare.
+# Il peso del corpo deve bastare da solo a superare la soglia: un messaggio che
+# scrive "vorrei prenotare una televisita" riguarda la telemedicina anche se
+# l'oggetto dice solo "Richiesta". Il rumore da tenere fuori sta nelle altre due
+# zone - il testo citato di una risposta e i nomi delle caselle in copia - e
+# quelle restano volutamente leggere.
+PESI_PER_ZONA = {"oggetto": 3.2, "corpo": 2.6, "citato": 1.2, "indirizzi": 0.5}
 
 # Contesti che escludono la prenotazione: il messaggio parla di telemedicina,
 # ma per contarne gli accessi, fatturarla, venderla o segnalarne un guasto.
@@ -91,10 +114,18 @@ NOT_A_BOOKING = (
      "abilitazione a una piattaforma", -1.2),
     (r"\bcertificato di malattia\b|\bcertificato ecm\b|\bferie\b|\bpermesso\b",
      "documentazione del personale", -1.4),
-    (r"\bdisdet\w*|\bdisdire\b|\bannull\w*|\bcancell\w*",
-     "disdetta o annullamento", -2.4),
     (r"\bprogett\w*|\bbozza\b|\bmodulo i\b|\bfollow up\b",
      "documento progettuale", -1.2),
+)
+
+# Chi scrive per disdire non sta prenotando, e lo fa usando le stesse parole di
+# una prenotazione ("vorrei disdire l'appuntamento di televisita prenotato"):
+# il peso deve poter annullare tutti gli indizi a favore messi insieme. Per lo
+# stesso motivo vale pieno anche nel corpo, a differenza degli altri contesti:
+# "vorrei disdire" scritto nel corpo e' chiaro quanto nell'oggetto.
+CANCEL_SIGNALS = (
+    (r"\bdisdet\w*|\bdisdire\b|\bannull\w*|\bcancell\w*",
+     "disdetta o annullamento", -4.0),
 )
 
 # Risposte automatiche e payload non risolti dal flusso: da scartare subito.
@@ -162,43 +193,34 @@ def score_telemedicine(
     zones = _Zones(subject, body)
     accumulator = _Accumulator(settings.telemedicine_bias)
 
-    for pattern, label in TELEMEDICINE_TERMS:
-        if zones.in_subject(pattern):
-            accumulator.add(label, "oggetto", 3.2)
-            if zones.in_visible_body(pattern):
-                # Nell'oggetto e ripreso nel corpo: il tema e' quello, non un
-                # riferimento di passaggio nel titolo.
-                accumulator.add(f"{label} ripreso nel corpo", "corpo", 0.8)
-        elif zones.in_visible_body(pattern):
-            accumulator.add(label, "corpo", 2.0)
-        elif zones.in_quoted_body(pattern):
-            # In una risposta la parte citata e' contesto, non il messaggio.
-            accumulator.add(f"{label} (testo citato)", "citato", 1.2)
-        elif zones.in_addresses(pattern):
-            # "telemedicina@aslsalerno.it" fra i destinatari non dice nulla sul
-            # contenuto: e' l'ufficio che riceve, non l'argomento.
-            accumulator.add(f"{label} (solo in indirizzi)", "indirizzi", 0.5)
+    for pattern, label, fuzzy_terms in TELEMEDICINE_TERMS:
+        zona, scorretta = zones.find(pattern, fuzzy_terms)
+        if zona is None:
+            continue
+        accumulator.add(_etichetta(label, zona, scorretta), zona, PESI_PER_ZONA[zona])
+        if zona == "oggetto" and zones.find(pattern, fuzzy_terms, ("corpo",))[0]:
+            # Nell'oggetto e ripreso nel corpo: il tema e' quello, non un
+            # riferimento di passaggio nel titolo.
+            accumulator.add(f"{label} ripreso nel corpo", "corpo", 0.8)
 
-    names = " ".join(attachment_names)
-    if names:
-        normalized_names = normalize(names)
-        for pattern, label in TELEMEDICINE_TERMS:
-            if re.search(pattern, normalized_names):
-                accumulator.add(f"{label} nel nome del file", "allegati", 1.8)
-                break
+    nome_trovato, nome_scorretto = _cerca_nel_testo(" ".join(attachment_names))
+    if nome_trovato is not None:
+        accumulator.add(
+            _etichetta(f"{nome_trovato} nel nome del file", "allegati", nome_scorretto),
+            "allegati", 1.8,
+        )
 
-    if document_text:
-        normalized_document = normalize(document_text)
-        for pattern, label in TELEMEDICINE_TERMS:
-            if re.search(pattern, normalized_document):
-                accumulator.add(f"{label} nel documento letto", "documento", 2.4)
-                break
+    documento_trovato, documento_scorretto = _cerca_nel_testo(document_text)
+    if documento_trovato is not None:
+        # L'OCR sbaglia proprio queste parole: la tolleranza serve soprattutto qui.
+        accumulator.add(
+            _etichetta(f"{documento_trovato} nel documento letto", "documento", documento_scorretto),
+            "documento", 2.4,
+        )
     if document_matched:
         accumulator.add("documento con tutti i criteri", "documento", 2.5)
 
-    for pattern, label, weight in AUTOMATIC_REPLY:
-        if zones.in_subject(pattern) or zones.in_visible_body(pattern):
-            accumulator.add(label, "oggetto" if zones.in_subject(pattern) else "corpo", weight)
+    _apply_context(accumulator, zones, AUTOMATIC_REPLY)
 
     return _build(accumulator, settings, settings.telemedicine_threshold)
 
@@ -227,22 +249,17 @@ def score_booking(
         round(2.0 * telemedicine.percent / 100.0, 2),
     )
 
-    for pattern, label, subject_weight, body_weight in BOOKING_TERMS:
-        if zones.in_subject(pattern):
-            accumulator.add(label, "oggetto", subject_weight)
-        elif zones.in_visible_body(pattern):
-            accumulator.add(label, "corpo", body_weight)
+    for pattern, label, subject_weight, body_weight, fuzzy_terms in BOOKING_TERMS:
+        zona, scorretta = zones.find(pattern, fuzzy_terms, ("oggetto", "corpo"))
+        if zona is None:
+            continue
+        peso = subject_weight if zona == "oggetto" else body_weight
+        accumulator.add(_etichetta(label, zona, scorretta), zona, peso)
 
-    for pattern, label, weight in NOT_A_BOOKING:
-        if zones.in_subject(pattern):
-            accumulator.add(label, "oggetto", weight)
-        elif zones.in_visible_body(pattern):
-            # Nel corpo il contesto contrario pesa un po' meno che nell'oggetto.
-            accumulator.add(label, "corpo", weight * 0.7)
-
-    for pattern, label, weight in AUTOMATIC_REPLY:
-        if zones.in_subject(pattern) or zones.in_visible_body(pattern):
-            accumulator.add(label, "oggetto" if zones.in_subject(pattern) else "corpo", weight)
+    # Nel corpo il contesto contrario pesa un po' meno che nell'oggetto.
+    _apply_context(accumulator, zones, NOT_A_BOOKING, body_factor=0.7)
+    _apply_context(accumulator, zones, CANCEL_SIGNALS)
+    _apply_context(accumulator, zones, AUTOMATIC_REPLY)
 
     if document_matched:
         # L'impegnativa allegata con tutti i criteri e' l'indizio piu' concreto.
@@ -256,32 +273,111 @@ def score_booking(
 # ------------------------------------------------------------------ supporto
 
 
+def _apply_context(
+    accumulator: "_Accumulator",
+    zones: "_Zones",
+    signals: Sequence[Tuple[str, str, float]],
+    *,
+    body_factor: float = 1.0,
+) -> None:
+    """Applica gli indizi di contesto, che valgono solo scritti per esteso.
+
+    Non passano dal riconoscimento degli errori: sono espressioni di contorno
+    ("variazioni economiche", "apertura agenda"), non termini clinici, e una
+    somiglianza approssimata porterebbe piu' equivoci che aiuto.
+    """
+    for pattern, label, weight in signals:
+        zona, _ = zones.find(pattern, (), ("oggetto", "corpo"))
+        if zona is None:
+            continue
+        accumulator.add(label, zona, weight if zona == "oggetto" else weight * body_factor)
+
+
+def _cerca_nel_testo(text: str) -> Tuple[Optional[str], Optional[str]]:
+    """Primo termine di telemedicina in un testo senza zone (nomi, documenti)."""
+    if not text:
+        return None, None
+    trovati = trova_termini(text)
+    for _pattern, label, fuzzy_terms in TELEMEDICINE_TERMS:
+        for termine in fuzzy_terms:
+            forma = trovati.get(termine)
+            if forma is not None:
+                return label, (forma if forma != termine else None)
+    return None, None
+
+
+def _etichetta(label: str, zona: str, scorretta: Optional[str]) -> str:
+    """Etichetta dell'indizio, con la forma davvero letta se era scorretta."""
+    if scorretta is not None:
+        label = f"{label} (scritto '{scorretta}')"
+    if zona == "citato":
+        return f"{label} (testo citato)"
+    if zona == "indirizzi":
+        # "telemedicina@aslsalerno.it" fra i destinatari non dice nulla sul
+        # contenuto: e' l'ufficio che riceve, non l'argomento.
+        return f"{label} (solo in indirizzi)"
+    return label
+
+
 class _Zones:
-    """Il testo diviso nelle zone che pesano in modo diverso."""
+    """Il testo diviso nelle zone che pesano in modo diverso.
+
+    Ogni zona viene cercata due volte: con l'espressione regolare, che copre le
+    forme flesse, e - solo se quella non trova nulla - con il riconoscimento
+    delle parole scritte male.
+    """
+
+    ORDINE = ("oggetto", "corpo", "citato", "indirizzi")
 
     def __init__(self, subject: str, body: str) -> None:
-        self._subject = normalize(subject)
         # Si divide prima (i marcatori stanno proprio nelle righe di
         # instradamento), poi si ripulisce ciascuna parte.
         visible, quoted = _split_quoted(body)
         # Indirizzi e righe di instradamento escono dal testo: sono metadati di
         # consegna, non argomento del messaggio. Restano da parte, cosi' si puo'
         # comunque dire "il termine compare solo negli indirizzi".
-        self._addresses = normalize(" ".join(_EMAIL_ADDRESS.findall(f"{subject} {body}")))
-        self._visible = _readable(visible)
-        self._quoted = _readable(quoted)
+        self._testo = {
+            "oggetto": normalize(subject),
+            "corpo": _readable(visible),
+            "citato": _readable(quoted),
+            "indirizzi": normalize(" ".join(_EMAIL_ADDRESS.findall(f"{subject} {body}"))),
+        }
+        # Le parole scritte male si cercano una volta per zona, non una volta
+        # per regola: il confronto costa, i termini da cercare sono sempre gli
+        # stessi.
+        self._scorrette: Dict[str, Dict[str, str]] = {
+            zona: trova_termini(testo) for zona, testo in self._testo.items()
+        }
 
-    def in_subject(self, pattern: str) -> bool:
-        return bool(re.search(pattern, self._subject))
+    def find(
+        self,
+        pattern: str,
+        fuzzy_terms: Sequence[str] = (),
+        zones: Sequence[str] = ORDINE,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Prima zona in cui compare il termine.
 
-    def in_visible_body(self, pattern: str) -> bool:
-        return bool(re.search(pattern, self._visible))
+        Restituisce ``(zona, forma scorretta)``: la forma scorretta e' valorizzata
+        solo quando il termine e' stato riconosciuto nonostante un errore di
+        scrittura, e finisce nella risposta perche' si veda cosa e' stato letto.
+        """
+        for zona in zones:
+            if re.search(pattern, self._testo[zona]):
+                return zona, None
+            scorretta = self._forma_scorretta(zona, fuzzy_terms)
+            if scorretta is not None:
+                return zona, scorretta
+        return None, None
 
-    def in_quoted_body(self, pattern: str) -> bool:
-        return bool(re.search(pattern, self._quoted))
-
-    def in_addresses(self, pattern: str) -> bool:
-        return bool(re.search(pattern, self._addresses))
+    def _forma_scorretta(self, zona: str, fuzzy_terms: Sequence[str]) -> Optional[str]:
+        trovate = self._scorrette[zona]
+        for termine in fuzzy_terms:
+            forma = trovate.get(termine)
+            # Se la parola era scritta bene l'ha gia' presa l'espressione
+            # regolare: qui interessa solo cio' che quella non ha visto.
+            if forma is not None and forma != termine:
+                return forma
+        return None
 
 
 def _readable(text: str) -> str:

@@ -309,13 +309,30 @@ quasi nulla se compaiono solo dentro un indirizzo di posta
 (`telemedicina@aslsalerno.it` in copia non rende il messaggio una questione di
 telemedicina).
 
-Cosa alza quella di **prenotazione**: `prenotare`, `appuntamento`,
-`impegnativa`, `ricetta`, il codice `1501A`, i riferimenti di una prenotazione,
-la richiesta di disponibilita' e - soprattutto - un allegato che soddisfa tutti
-i criteri. Cosa la abbassa: rendiconti di accessi e presenze, pratiche
-economiche, documenti commerciali, newsletter, segnalazioni di guasto, richieste
-di apertura agenda o di abilitazione a una piattaforma, disdette e risposte
-automatiche.
+Cosa alza quella di **prenotazione**: `prenotazione`, `televisita`, `visita`,
+`impegnativa`, `piano terapeutico`, `telemedicina`, `appuntamento`, `ricetta`,
+il codice `1501A`, i riferimenti di una prenotazione, la richiesta di
+disponibilita' e - soprattutto - un allegato che soddisfa tutti i criteri. Cosa
+la abbassa: rendiconti di accessi e presenze, pratiche economiche, documenti
+commerciali, newsletter, segnalazioni di guasto, richieste di apertura agenda o
+di abilitazione a una piattaforma, e risposte automatiche. Le disdette pesano
+piu' di tutto il resto messo insieme: chi scrive per annullare usa le stesse
+parole di chi prenota, quindi il segnale contrario deve poterle azzerare.
+
+### Parole scritte male
+
+I termini che contano vengono riconosciuti anche con un errore di battitura -
+`telvisita`, `televista`, `telveisita`, `prenotazine`, `impegnatva`,
+`terapetico` - e la stessa tolleranza copre gli errori dell'OCR, che su una
+scansione storta sbaglia proprio queste parole. Il punteggio non cambia: una
+richiesta scritta male vale quanto la stessa scritta bene, e l'indizio riporta
+la forma davvero letta (`"televisita (scritto 'telvisita')"`).
+
+Quanta differenza si accetta dipende dalla lunghezza: due lettere su
+`telemonitoraggio`, una su `impegnativa`, nessuna sotto le sei lettere. Le
+parole italiane vicine a un termine ma di altro significato sono escluse a
+mano: `vista` dista una sola lettera da `visita`, e "dal nostro punto di vista"
+non e' una richiesta di visita.
 
 `sentiment.punteggio` va da `-1` (negativo) a `+1` (positivo);
 `sentiment.prenotazione.punteggio` va da `0` a `1` ed e' confrontato con
@@ -441,6 +458,7 @@ src/inoltro_email/
 ├── rawjson.py         lettura tollerante del JSON non valido prodotto dal flusso
 ├── inbound.py         lettura del payload di Power Automate (HTML, base64, foto del corpo, percorsi su disco)
 ├── confidence.py      percentuali di sicurezza: telemedicina e prenotazione
+├── spelling.py        riconoscimento dei termini scritti male (refusi e OCR)
 ├── matching.py        normalizzazione del testo, screening e criteri telemedicina/1501A
 ├── analysis.py        orchestrazione: screening -> sicurezza -> OCR -> criteri -> percentuali
 ├── sentiment.py       punteggio di polarita' e di intento di prenotazione

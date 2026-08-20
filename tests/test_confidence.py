@@ -168,3 +168,96 @@ def test_soglie_configurabili(impostazioni: ConfidenceSettings) -> None:
     assert normale.percent == esigente.percent
     assert normale.holds is True
     assert esigente.holds is False
+
+
+# ------------------------------------------- keyword richieste e refusi
+
+
+@pytest.mark.parametrize(
+    "oggetto,corpo",
+    [
+        ("Richiesta televisita", "Buongiorno, chiedo una televisita di cardiologia."),
+        ("Prenotazione", "Vorrei prenotare una televisita per la paziente. Allego l'impegnativa."),
+        ("Prenotazione visita", "Si chiede una visita in telemedicina per la paziente."),
+        ("Invio impegnativa", "Allego l'impegnativa per la televisita della paziente."),
+        ("Rinnovo piano terapeutico",
+         "Si chiede appuntamento di televisita per il rinnovo del piano terapeutico."),
+        ("Telemedicina", "Vorrei prenotare una visita in telemedicina. Allego la ricetta."),
+    ],
+)
+def test_keyword_di_prenotazione(oggetto: str, corpo: str, impostazioni: ConfidenceSettings) -> None:
+    telemedicina, prenotazione = _percentuali(oggetto, corpo, impostazioni)
+
+    assert telemedicina.holds and prenotazione.holds, prenotazione.evidence
+
+
+@pytest.mark.parametrize(
+    "oggetto,corpo",
+    [
+        # Stessa richiesta, scritta male in punti diversi.
+        ("Richiesta prenotazine telvisita", "Vorrei prentoare una telvisita."),
+        ("Richiesta", "Buongiorno, vorrei prenotre una telveisita. Allego l'impegnatva."),
+        ("Rinnovo pinao terapetico", "Chiedo appuntamneto di telvisita per il piano."),
+        ("Prenotazione televista", "Allego l'impegnatva per la televista di cardiologia."),
+    ],
+)
+def test_prenotazione_riconosciuta_anche_scritta_male(
+    oggetto: str, corpo: str, impostazioni: ConfidenceSettings
+) -> None:
+    telemedicina, prenotazione = _percentuali(oggetto, corpo, impostazioni)
+
+    assert telemedicina.holds and prenotazione.holds, prenotazione.evidence
+
+
+def test_il_refuso_non_cambia_il_punteggio(impostazioni: ConfidenceSettings) -> None:
+    corretto = _percentuali(
+        "Richiesta prenotazione televisita", "Vorrei prenotare una televisita.", impostazioni
+    )
+    sbagliato = _percentuali(
+        "Richiesta prenotazine telvisita", "Vorrei prenotare una telvisita.", impostazioni
+    )
+
+    assert corretto[0].percent == sbagliato[0].percent
+    assert corretto[1].percent == sbagliato[1].percent
+
+
+def test_la_forma_scorretta_finisce_negli_indizi(impostazioni: ConfidenceSettings) -> None:
+    """Chi legge la risposta deve vedere cosa e' stato interpretato e come."""
+    telemedicina, _prenotazione = _percentuali(
+        "Richiesta telvisita", "Buongiorno.", impostazioni
+    )
+
+    etichette = [indizio.label for indizio in telemedicina.evidence]
+    assert any("scritto 'telvisita'" in etichetta for etichetta in etichette)
+
+
+def test_refuso_nel_documento_letto_dall_ocr(impostazioni: ConfidenceSettings) -> None:
+    """L'OCR sbaglia proprio questi termini: la tolleranza serve soprattutto qui."""
+    punteggio = score_telemedicine(
+        "Invio documento", "In allegato quanto in oggetto.", impostazioni,
+        document_text="RICHIESTA DI TELEMDICINA prestazione 1501A",
+    )
+
+    assert punteggio.holds is True
+    assert any("scritto" in indizio.label for indizio in punteggio.evidence)
+
+
+def test_una_parola_vicina_non_diventa_una_prenotazione(
+    impostazioni: ConfidenceSettings,
+) -> None:
+    """"punto di vista" non e' una richiesta di visita."""
+    _telemedicina, prenotazione = _percentuali(
+        "Preventivo", "Dal nostro punto di vista il preventivo e' congruo.", impostazioni
+    )
+
+    assert prenotazione.holds is False
+    assert not any("visita" in indizio.label for indizio in prenotazione.positives)
+
+
+def test_termine_nel_solo_corpo_supera_la_soglia(impostazioni: ConfidenceSettings) -> None:
+    """L'oggetto generico non deve affossare un corpo esplicito."""
+    punteggio = score_telemedicine(
+        "Richiesta", "Buongiorno, vorrei prenotare una televisita.", impostazioni
+    )
+
+    assert punteggio.holds is True
