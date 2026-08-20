@@ -23,8 +23,12 @@ screening:
   # any = basta uno dei termini (telemedicina OPPURE televisita)
   # all = servono tutti
   mode: "any"
-  # true = niente OCR se lo screening non passa (risparmia quota).
-  stop_on_failure: true
+  # false (predefinito) = gli allegati si leggono comunque, anche se oggetto e
+  # corpo non parlano di telemedicina: il contenuto di un'impegnativa puo'
+  # ribaltare un oggetto che non dice nulla, e il verdetto si vuole con tutti i
+  # dati alla mano. true = niente OCR se lo screening non passa (risparmia
+  # quota, ma perde i messaggi con l'oggetto generico).
+  stop_on_failure: false
 
 # Criteri che deve soddisfare il testo letto dagli allegati e dalle foto.
 rules:
@@ -52,6 +56,16 @@ ocr:
   # Con un piano PRO si possono alzare (es. 5242880 e 999).
   max_file_bytes: 1048576
   max_pdf_pages_per_request: 3
+  # true (predefinito) = ogni documento leggibile passa dall'OCR, anche un PDF
+  # che ha gia' il proprio livello di testo: i due testi vengono uniti, perche'
+  # dentro un PDF nativo puo' esserci una scansione che solo l'OCR legge.
+  # false = il PDF con il testo non viene mandato all'OCR (meno quota consumata,
+  # ma si perde cio' che nel PDF e' solo immagine).
+  always_call: true
+  # true = un'immagine oltre max_file_bytes viene ridimensionata e inviata
+  # comunque, invece di essere saltata. Una foto di impegnativa scattata col
+  # telefono supera sempre il MB del piano gratuito.
+  resize_oversized_images: true
 
 attachments:
   allowed_extensions:
@@ -63,9 +77,16 @@ attachments:
   include_inline_images: true
   # Quanti file al massimo passare all'OCR per ogni email.
   max_files: 10
-  # false = ci si ferma al primo file conforme (meno chiamate all'OCR)
-  # true  = si leggono comunque tutti i file, utile per diagnosticare
-  analyze_all: false
+  # true (predefinito) = si leggono tutti i file allegati, anche dopo averne
+  # trovato uno conforme: il verdetto tiene conto di tutto quello che e'
+  # arrivato. false = ci si ferma al primo conforme (meno chiamate all'OCR).
+  analyze_all: true
+  # Restituisce nella risposta il testo letto da ogni documento. E' un dato
+  # sanitario: chi non lo vuole in giro lo mette a false.
+  return_text: true
+  # Quanto testo restituire per documento (0 = tutto). Serve solo a non far
+  # esplodere la risposta con un referto di venti pagine.
+  max_text_chars: 20000
 
 # Allegati che il flusso non manda in base64 ma indica con il percorso su disco
 # (campo "attchment" del payload). Quei percorsi sono la base per l'OCR: il file
@@ -93,10 +114,10 @@ confidence:
   # Insieme alla precedente determina "prenotazione_telemedicina".
   booking_threshold: 60
   # Sotto questa percentuale, calcolata prima dell'OCR su oggetto, corpo e nomi
-  # dei file, non si spende una chiamata all'OCR: e' cio' che ferma newsletter,
-  # fogli di accessi e messaggi in cui "telemedicina" e' solo il nome della
-  # casella in copia.
-  min_percent_for_ocr: 25
+  # dei file, non si spende una chiamata all'OCR. Zero (predefinito) = si legge
+  # sempre tutto. Alzandola si risparmia quota su newsletter e fogli di accessi,
+  # al prezzo di non vedere il contenuto dei loro allegati.
+  min_percent_for_ocr: 0
   # Taratura fine: sono i termini costanti dei due punteggi, in log-odds. Piu'
   # sono negativi, piu' indizi servono per arrivare a una percentuale alta.
   telemedicine_bias: -2.2

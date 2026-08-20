@@ -51,10 +51,14 @@ class FakeOcrClient:
         self.texts = texts or {}
         self.default_text = default_text
         self.calls: List[str] = []
+        # Dimensione di cio' che e' stato davvero inviato: serve a verificare
+        # che un'immagine ridimensionata arrivi sotto il limite dell'API.
+        self.sizes: List[int] = []
 
     def parse_file(self, path: Path) -> OcrResult:
         path = Path(path)
         self.calls.append(path.name)
+        self.sizes.append(path.stat().st_size if path.is_file() else 0)
         for fragment, text in self.texts.items():
             if fragment in path.name:
                 return OcrResult(text=text, exit_code=1)
@@ -138,6 +142,30 @@ def make_pdf(text_pages: List[str]) -> bytes:
         })
     buffer = io.BytesIO()
     writer.write(buffer)
+    return buffer.getvalue()
+
+
+def make_photo(width: int = 2400, height: int = 1800) -> bytes:
+    """PNG che si comporta come una foto scattata col telefono.
+
+    Serve un'immagine con struttura continua: il rumore puro non si comprime
+    in nessun formato e sarebbe il caso peggiore possibile, una tinta unita si
+    comprimerebbe a pochi byte e non proverebbe nulla. Una macchia di colori
+    ingrandita ha la stessa natura di una foto - PNG pesante, JPEG leggero -
+    ed e' immediata da costruire.
+    """
+    import random
+
+    from PIL import Image
+
+    generatore = random.Random(12345)  # stessa immagine a ogni esecuzione
+    seme = Image.new("RGB", (60, 45))
+    seme.putdata([
+        (generatore.randint(0, 255), generatore.randint(0, 255), generatore.randint(0, 255))
+        for _ in range(60 * 45)
+    ])
+    buffer = io.BytesIO()
+    seme.resize((width, height), Image.BICUBIC).save(buffer, format="PNG")
     return buffer.getvalue()
 
 

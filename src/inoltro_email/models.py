@@ -22,6 +22,7 @@ class TextSource(str, Enum):
 
     PDF_TEXT = "pdf_text"  # livello di testo gia' presente nel PDF
     OCR = "ocr"  # estratto da ocr.space
+    PDF_TEXT_OCR = "pdf_text+ocr"  # livello di testo del PDF piu' lettura OCR
     SKIPPED = "skipped"  # allegato non analizzato (estensione/dimensione)
     ERROR = "error"  # estrazione fallita
 
@@ -147,9 +148,13 @@ class ExtractedText:
     source: TextSource
     error: Optional[str] = None
 
+    # Cosa e' stato fatto al file prima di leggerlo (per ora: il
+    # ridimensionamento di un'immagine troppo grande per l'OCR).
+    note: Optional[str] = None
+
     @property
     def ok(self) -> bool:
-        return self.source in (TextSource.PDF_TEXT, TextSource.OCR)
+        return self.source in (TextSource.PDF_TEXT, TextSource.OCR, TextSource.PDF_TEXT_OCR)
 
 
 @dataclass
@@ -213,6 +218,10 @@ class AttachmentAnalysis:
     chars: int = 0
     match: Optional[MatchReport] = None
     error: Optional[str] = None
+    # Testo effettivamente letto dal documento: restituito nella risposta,
+    # cosi' si vede su cosa e' stato deciso.
+    text: str = ""
+    note: Optional[str] = None
 
     @property
     def matched(self) -> bool:

@@ -28,8 +28,28 @@ def analizza(settings: Settings, payload: dict, ocr: FakeOcrClient | None = None
 # ------------------------------------------------------------------ screening
 
 
-def test_email_senza_telemedicina_scartata_senza_ocr(settings: Settings) -> None:
-    """Se oggetto e corpo non ne parlano, non si spende una chiamata OCR."""
+def test_gli_allegati_si_leggono_anche_senza_riscontro_nel_testo(
+    settings: Settings,
+) -> None:
+    """Il contenuto di un allegato puo' ribaltare un oggetto che non dice nulla."""
+    payload = email_payload(
+        subject="Richiesta appuntamento",
+        body="Buongiorno, vorrei prenotare una visita in ambulatorio.",
+        attachments=[attachment_payload("referto.pdf", make_blank_pdf())],
+    )
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert not analysis.screening.passed
+    assert ocr.calls == ["referto.pdf"]  # letto lo stesso
+    assert analysis.esito is Esito.CONFORME  # il documento contiene i criteri
+    # Il sentiment viene calcolato comunque: serve a chi legge la risposta.
+    assert analysis.sentiment.booking.score > 0
+
+
+def test_stop_on_failure_risparmia_le_chiamate(settings: Settings) -> None:
+    """Chi vuole risparmiare quota puo' ancora fermarsi allo screening."""
+    settings.screening.stop_on_failure = True
     payload = email_payload(
         subject="Richiesta appuntamento",
         body="Buongiorno, vorrei prenotare una visita in ambulatorio.",
@@ -40,10 +60,7 @@ def test_email_senza_telemedicina_scartata_senza_ocr(settings: Settings) -> None
 
     assert analysis.esito is Esito.SCARTATA
     assert not analysis.conforme
-    assert not analysis.screening.passed
     assert ocr.calls == []
-    # Il sentiment viene calcolato comunque: serve a chi legge la risposta.
-    assert analysis.sentiment.booking.score > 0
 
 
 def test_screening_puo_proseguire_anche_senza_riscontro(settings: Settings) -> None:
@@ -76,7 +93,23 @@ def test_allegato_conforme_promuove_l_email(settings: Settings) -> None:
     assert analysis.screening.terms == ["televisita"]
 
 
-def test_pdf_con_livello_di_testo_non_passa_dall_ocr(settings: Settings) -> None:
+def test_pdf_con_livello_di_testo_passa_comunque_dall_ocr(settings: Settings) -> None:
+    """I due testi si uniscono: il livello di testo e' esatto, l'OCR aggiunge
+    cio' che nel PDF e' solo immagine."""
+    pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
+
+    analysis, ocr = analizza(settings, payload, FakeOcrClient(default_text="timbro del medico"))
+
+    assert analysis.esito is Esito.CONFORME
+    assert ocr.calls == ["impegnativa.pdf"]
+    assert analysis.attachments[0].source is TextSource.PDF_TEXT_OCR
+    assert "TELEMEDICINA" in analysis.attachments[0].text
+    assert "timbro del medico" in analysis.attachments[0].text
+
+
+def test_pdf_con_livello_di_testo_senza_ocr_se_richiesto(settings: Settings) -> None:
+    settings.ocr.always_call = False
     pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
     payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
 
@@ -84,6 +117,23 @@ def test_pdf_con_livello_di_testo_non_passa_dall_ocr(settings: Settings) -> None
 
     assert analysis.esito is Esito.CONFORME
     assert ocr.calls == []
+    assert analysis.attachments[0].source is TextSource.PDF_TEXT
+
+
+def test_ocr_fallito_ripiega_sul_livello_di_testo(settings: Settings) -> None:
+    """Se il PDF il testo ce l'ha, un OCR non riuscito non fa perdere il documento."""
+    class OcrRotto:
+        calls: list = []
+
+        def parse_file(self, path):
+            raise OcrSpaceError("quota giornaliera esaurita")
+
+    pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
+
+    analysis, _ = analizza(settings, payload, OcrRotto())
+
+    assert analysis.esito is Esito.CONFORME
     assert analysis.attachments[0].source is TextSource.PDF_TEXT
 
 
@@ -120,7 +170,22 @@ def test_foto_nel_corpo_analizzata(settings: Settings) -> None:
     assert analysis.attachments[0].origine is Origine.CORPO
 
 
-def test_ci_si_ferma_al_primo_documento_conforme(settings: Settings) -> None:
+def test_tutti_i_documenti_vengono_letti(settings: Settings) -> None:
+    """Anche dopo un documento conforme si legge il resto: tutto fa computo."""
+    payload = email_payload(attachments=[
+        attachment_payload("primo.pdf", make_blank_pdf()),
+        attachment_payload("secondo.pdf", make_blank_pdf()),
+    ])
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert len(ocr.calls) == 2
+    assert len(analysis.attachments) == 2
+    assert analysis.matched_attachment == "primo.pdf"
+
+
+def test_ci_si_puo_fermare_al_primo_conforme(settings: Settings) -> None:
+    settings.attachments.analyze_all = False
     payload = email_payload(attachments=[
         attachment_payload("primo.pdf", make_blank_pdf()),
         attachment_payload("secondo.pdf", make_blank_pdf()),
@@ -132,17 +197,39 @@ def test_ci_si_ferma_al_primo_documento_conforme(settings: Settings) -> None:
     assert analysis.matched_attachment == "primo.pdf"
 
 
-def test_analyze_all_legge_tutti_i_documenti(settings: Settings) -> None:
-    settings.attachments.analyze_all = True
+def test_criteri_riassunti_su_tutti_i_documenti(settings: Settings) -> None:
+    """I trovati sono l'unione, i mancanti solo cio' che non c'e' da nessuna parte."""
     payload = email_payload(attachments=[
+        attachment_payload("parziale.pdf", make_blank_pdf()),
+        attachment_payload("altro.pdf", make_blank_pdf()),
+    ])
+    ocr = FakeOcrClient(texts={
+        "parziale": "Richiesta di telemedicina senza codice",
+        "altro": "Prestazione 1501A",
+    })
+
+    analysis, _ = analizza(settings, payload, ocr)
+
+    # Nessun documento ha entrambi i criteri: non e' conforme...
+    assert analysis.esito is Esito.NON_CONFORME
+    # ...ma la risposta dice cosa e' stato trovato nell'insieme del messaggio.
+    assert analysis.match is not None
+    assert sorted(analysis.match.found) == ["1501A", "telemedicina"]
+    assert analysis.match.missing == []
+
+
+def test_piu_documenti_conformi_alzano_la_sicurezza(settings: Settings) -> None:
+    uno = email_payload(attachments=[attachment_payload("primo.pdf", make_blank_pdf())])
+    due = email_payload(attachments=[
         attachment_payload("primo.pdf", make_blank_pdf()),
         attachment_payload("secondo.pdf", make_blank_pdf()),
     ])
 
-    analysis, ocr = analizza(settings, payload)
+    con_uno, _ = analizza(settings, uno)
+    con_due, _ = analizza(settings, due)
 
-    assert len(ocr.calls) == 2
-    assert len(analysis.attachments) == 2
+    assert con_due.telemedicina.percent >= con_uno.telemedicina.percent
+    assert sum(1 for item in con_due.attachments if item.matched) == 2
 
 
 def test_secondo_allegato_recupera_la_conformita(settings: Settings) -> None:

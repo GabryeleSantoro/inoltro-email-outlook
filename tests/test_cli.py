@@ -31,6 +31,9 @@ rules:
 ocr:
   endpoint: "https://api.ocr.space/parse/image"
   engine: 2
+  # Nessuna chiamata di rete nei test della riga di comando: qui si usano PDF
+  # che il livello di testo ce l'hanno gia'.
+  always_call: false
 logging:
   level: "WARNING"
   file: null
@@ -67,6 +70,7 @@ def test_analizza_payload_conforme(config_file: Path, tmp_path: Path, capsys) ->
 
 
 def test_analizza_email_fuori_tema(config_file: Path, tmp_path: Path, capsys) -> None:
+    """Senza allegati non c'e' nulla da leggere: l'esito lo dicono le percentuali."""
     payload = tmp_path / "email.json"
     payload.write_text(
         json.dumps(email_payload(subject="Fattura", body="In allegato la fattura di luglio.")),
@@ -76,7 +80,10 @@ def test_analizza_email_fuori_tema(config_file: Path, tmp_path: Path, capsys) ->
     code = main(["--config", str(config_file), "analizza", str(payload)])
 
     assert code == 0
-    assert json.loads(capsys.readouterr().out)["esito"] == "scartata"
+    risposta = json.loads(capsys.readouterr().out)
+    assert risposta["esito"] == "senza_contenuto"
+    assert risposta["prenotazione_telemedicina"] is False
+    assert risposta["telemedicina"]["percentuale"] < 25
 
 
 def test_analizza_da_standard_input(config_file: Path, capsys,

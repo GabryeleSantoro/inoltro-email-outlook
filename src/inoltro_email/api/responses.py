@@ -15,8 +15,19 @@ from ..models import (
 )
 
 
-def analysis_to_dict(analysis: EmailAnalysis) -> Dict[str, Any]:
-    """Rappresentazione JSON completa del verdetto."""
+def analysis_to_dict(
+    analysis: EmailAnalysis,
+    *,
+    include_text: bool = True,
+    max_text_chars: int = 0,
+) -> Dict[str, Any]:
+    """Rappresentazione JSON completa del verdetto.
+
+    ``include_text`` e ``max_text_chars`` vengono da
+    ``attachments.return_text`` e ``attachments.max_text_chars``: il testo
+    letto dai documenti e' un dato sanitario, chi non lo vuole in giro puo'
+    escluderlo o troncarlo senza toccare il resto della risposta.
+    """
     return {
         "id_messaggio": analysis.message_key,
         "oggetto": analysis.subject,
@@ -33,7 +44,12 @@ def analysis_to_dict(analysis: EmailAnalysis) -> Dict[str, Any]:
             "dove": analysis.screening.where,
         },
         "criteri": _criteria_to_dict(analysis.match, analysis.matched_attachment),
-        "documenti": [_document_to_dict(item) for item in analysis.attachments],
+        "documenti": [
+            _document_to_dict(item, include_text=include_text, max_text_chars=max_text_chars)
+            for item in analysis.attachments
+        ],
+        "documenti_letti": sum(1 for item in analysis.attachments if item.chars > 0),
+        "documenti_conformi": sum(1 for item in analysis.attachments if item.matched),
         "sentiment": sentiment_to_dict(analysis.sentiment),
         "avvisi": analysis.warnings,
         "errore": analysis.error,
@@ -86,10 +102,15 @@ def _criteria_to_dict(match: Optional[MatchReport], documento: Optional[str]) ->
     }
 
 
-def _document_to_dict(item: AttachmentAnalysis) -> Dict[str, Any]:
+def _document_to_dict(
+    item: AttachmentAnalysis,
+    *,
+    include_text: bool,
+    max_text_chars: int,
+) -> Dict[str, Any]:
     trovati: List[str] = item.match.found if item.match else []
     mancanti: List[str] = item.match.missing if item.match else []
-    return {
+    documento: Dict[str, Any] = {
         "nome": item.name,
         "origine": item.origine.value,
         "sorgente": item.source.value,
@@ -97,5 +118,21 @@ def _document_to_dict(item: AttachmentAnalysis) -> Dict[str, Any]:
         "conforme": item.matched,
         "trovati": trovati,
         "mancanti": mancanti,
+        # Cosa e' stato fatto al file prima di leggerlo (ridimensionamento).
+        "nota": item.note,
         "errore": item.error,
     }
+    if include_text:
+        documento["testo"] = _clip(item.text, max_text_chars)
+        documento["testo_troncato"] = _is_clipped(item.text, max_text_chars)
+    return documento
+
+
+def _clip(text: str, max_chars: int) -> str:
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    return text[:max_chars]
+
+
+def _is_clipped(text: str, max_chars: int) -> bool:
+    return max_chars > 0 and len(text) > max_chars

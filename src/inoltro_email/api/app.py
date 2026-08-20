@@ -228,7 +228,13 @@ def create_app(
             len(email.attachments),
         )
         analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
-        return JSONResponse(analysis_to_dict(analysis))
+        return JSONResponse(
+            analysis_to_dict(
+                analysis,
+                include_text=settings.attachments.return_text,
+                max_text_chars=settings.attachments.max_text_chars,
+            )
+        )
 
     @app.exception_handler(HTTPException)
     async def _errore_http(_request: Request, exc: HTTPException) -> JSONResponse:

@@ -114,12 +114,16 @@ class EmailAnalyzer:
         conforme = esito is Esito.CONFORME
         sentiment = self._sentiment(email, attachment_matched=conforme)
 
-        # Punteggi definitivi: ora si sa anche cosa c'era negli allegati.
+        # Punteggi definitivi: ora si sa anche cosa c'era negli allegati, in
+        # tutti quanti, non solo nel primo utile.
+        conformi = sum(1 for item in analyses if item.matched)
         telemedicina = self._telemedicine_confidence(
-            email, document_text=text_read, document_matched=conforme
+            email, document_text=text_read, document_matched=conforme,
+            documents_matched=conformi,
         )
         prenotazione = self._booking_confidence(
-            email, telemedicina, document_text=text_read, document_matched=conforme
+            email, telemedicina, document_text=text_read, document_matched=conforme,
+            documents_matched=conformi,
         )
 
         logger.info(
@@ -211,7 +215,6 @@ class EmailAnalyzer:
             return [], None, None, ""
 
         analyses: List[AttachmentAnalysis] = []
-        best: Optional[MatchReport] = None
         matched_name: Optional[str] = None
         texts: List[str] = []
 
@@ -226,12 +229,17 @@ class EmailAnalyzer:
                     texts.append(extracted.text)
                     report = evaluate(extracted.text, self._settings.rules)
                     logger.info(
-                        "%s '%s' (%s): %s -> %s",
+                        "%s '%s' (%s, %d caratteri): %s -> %s",
                         item.origine.value, item.name, extracted.source.value,
-                        report.summary(), "conforme" if report.matched else "non conforme",
+                        len(extracted.text), report.summary(),
+                        "conforme" if report.matched else "non conforme",
                     )
-                    if best is None or report.matched:
-                        best = report
+                    logger.debug("Testo letto da '%s':\n%s", item.name, extracted.text)
+                else:
+                    logger.info(
+                        "%s '%s': nessun testo letto (%s).",
+                        item.origine.value, item.name, extracted.error or extracted.source.value,
+                    )
 
                 analyses.append(
                     AttachmentAnalysis(
@@ -241,16 +249,19 @@ class EmailAnalyzer:
                         chars=len(extracted.text),
                         match=report,
                         error=extracted.error,
+                        text=extracted.text,
+                        note=extracted.note,
                     )
                 )
 
                 if report is not None and report.matched:
-                    matched_name = item.name
+                    if matched_name is None:
+                        matched_name = item.name
                     if not self._settings.attachments.analyze_all:
-                        # Trovato: inutile spendere altre chiamate OCR.
+                        # Ci si ferma al primo conforme solo se richiesto.
                         break
 
-        return analyses, best, matched_name, "\n".join(texts)
+        return analyses, _aggregate(analyses), matched_name, "\n".join(texts)
 
     def _select(self, attachments: List[InboundAttachment]) -> List[InboundAttachment]:
         """Scarta cio' che non si sa leggere e limita il numero di chiamate OCR."""
@@ -295,6 +306,7 @@ class EmailAnalyzer:
         *,
         document_text: str = "",
         document_matched: bool = False,
+        documents_matched: int = 0,
     ) -> ConfidenceScore:
         return score_telemedicine(
             email.subject,
@@ -303,6 +315,7 @@ class EmailAnalyzer:
             attachment_names=[item.name for item in email.attachments],
             document_text=document_text,
             document_matched=document_matched,
+            documents_matched=documents_matched,
         )
 
     def _booking_confidence(
@@ -312,6 +325,7 @@ class EmailAnalyzer:
         *,
         document_text: str = "",
         document_matched: bool = False,
+        documents_matched: int = 0,
     ) -> ConfidenceScore:
         return score_booking(
             email.subject,
@@ -320,6 +334,7 @@ class EmailAnalyzer:
             telemedicine=telemedicina,
             document_text=document_text,
             document_matched=document_matched,
+            documents_matched=documents_matched,
         )
 
     # ----------------------------------------------------------------- utili
@@ -354,6 +369,51 @@ class EmailAnalyzer:
             warnings=list(email.warnings),
             duration_ms=int((time.monotonic() - started) * 1000),
         )
+
+
+def _aggregate(analyses: List[AttachmentAnalysis]) -> Optional[MatchReport]:
+    """Riassume i criteri trovati su *tutti* i documenti letti.
+
+    ``matched`` resta vero solo se un singolo documento soddisfa tutti i
+    criteri: l'impegnativa e' un foglio solo, e trovare "telemedicina" in un
+    file e "1501A" in un altro non equivale ad averla. Trovati e mancanti sono
+    invece l'unione su tutti i documenti, cosi' la risposta dice davvero cosa
+    e' stato letto nell'intero messaggio e non solo nel primo allegato utile.
+    """
+    letti = [item for item in analyses if item.match is not None]
+    if not letti:
+        return None
+
+    trovate_keyword: List[str] = []
+    trovati_codici: List[str] = []
+    for item in letti:
+        _extend_unique(trovate_keyword, item.match.found_keywords)
+        _extend_unique(trovati_codici, item.match.found_codes)
+
+    # Manca cio' che non e' stato trovato in nessuno dei documenti.
+    mancanti_keyword: List[str] = []
+    mancanti_codici: List[str] = []
+    for item in letti:
+        _extend_unique(mancanti_keyword, [
+            value for value in item.match.missing_keywords if value not in trovate_keyword
+        ])
+        _extend_unique(mancanti_codici, [
+            value for value in item.match.missing_codes if value not in trovati_codici
+        ])
+
+    return MatchReport(
+        matched=any(item.matched for item in letti),
+        found_keywords=trovate_keyword,
+        found_codes=trovati_codici,
+        missing_keywords=mancanti_keyword,
+        missing_codes=mancanti_codici,
+    )
+
+
+def _extend_unique(target: List[str], values: List[str]) -> None:
+    for value in values:
+        if value not in target:
+            target.append(value)
 
 
 def _decide(analyses: List[AttachmentAnalysis], match: Optional[MatchReport]) -> Esito:

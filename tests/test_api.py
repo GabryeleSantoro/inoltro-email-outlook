@@ -58,7 +58,8 @@ def test_email_conforme(client: TestClient) -> None:
     assert corpo["id_messaggio"] == "<msg-1@example.com>"
 
 
-def test_email_fuori_tema_scartata(client: TestClient, ocr: FakeOcrClient) -> None:
+def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:
+    """L'allegato si legge lo stesso: e' il suo contenuto a decidere."""
     payload = email_payload(
         subject="Fattura di luglio",
         body="Trasmettiamo la fattura in allegato.",
@@ -67,9 +68,25 @@ def test_email_fuori_tema_scartata(client: TestClient, ocr: FakeOcrClient) -> No
 
     corpo = client.post("/analizza-email", json=payload).json()
 
-    assert corpo["esito"] == "scartata"
-    assert corpo["conforme"] is False
     assert corpo["screening"]["superato"] is False
+    assert ocr.calls == ["fattura.pdf"]
+    # L'OCR di prova restituisce un testo conforme: il documento ribalta
+    # l'oggetto, ed e' esattamente il motivo per cui lo si legge.
+    assert corpo["esito"] == "conforme"
+    assert corpo["telemedicina"]["percentuale"] > 50
+
+
+def test_screening_puo_ancora_fermare_l_ocr(settings: Settings, ocr: FakeOcrClient) -> None:
+    settings.screening.stop_on_failure = True
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        corpo = instance.post("/analizza-email", json=email_payload(
+            subject="Fattura di luglio",
+            body="Trasmettiamo la fattura in allegato.",
+            attachments=[attachment_payload("fattura.pdf", make_blank_pdf())],
+        )).json()
+
+    assert corpo["esito"] == "scartata"
     assert ocr.calls == []
 
 
@@ -266,7 +283,9 @@ def test_email_di_telemedicina_che_non_e_prenotazione(
 def test_sotto_la_soglia_minima_non_si_chiama_l_ocr(
     settings: Settings, ocr: FakeOcrClient
 ) -> None:
-    """Il termine solo nell'indirizzo non giustifica una chiamata all'OCR."""
+    """Soglia configurata: chi vuole risparmiare quota puo' ancora farlo."""
+    settings.screening.stop_on_failure = True
+    settings.confidence.min_percent_for_ocr = 25.0
     analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
     with TestClient(create_app(settings, analyzer=analyzer)) as instance:
         corpo = instance.post(
@@ -282,3 +301,59 @@ def test_sotto_la_soglia_minima_non_si_chiama_l_ocr(
     assert corpo["esito"] == "scartata"
     assert corpo["telemedicina"]["percentuale"] < 25
     assert ocr.calls == []
+
+
+def test_il_testo_letto_torna_nella_risposta(client: TestClient) -> None:
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+
+    documento = client.post("/analizza-email", json=payload).json()["documenti"][0]
+
+    assert documento["testo"] == TESTO_CONFORME
+    assert documento["testo_troncato"] is False
+
+
+def test_il_testo_puo_essere_escluso(settings: Settings, ocr: FakeOcrClient) -> None:
+    """E' un dato sanitario: chi non lo vuole in giro lo toglie."""
+    settings.attachments.return_text = False
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        documento = instance.post("/analizza-email", json=email_payload(
+            attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())],
+        )).json()["documenti"][0]
+
+    assert "testo" not in documento
+    assert documento["caratteri"] > 0  # il conteggio resta
+
+
+def test_il_testo_viene_troncato(settings: Settings, ocr: FakeOcrClient) -> None:
+    settings.attachments.max_text_chars = 10
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        documento = instance.post("/analizza-email", json=email_payload(
+            attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())],
+        )).json()["documenti"][0]
+
+    assert documento["testo"] == TESTO_CONFORME[:10]
+    assert documento["testo_troncato"] is True
+    assert documento["caratteri"] == len(TESTO_CONFORME)
+
+
+def test_tutti_gli_allegati_arrivano_all_ocr(settings: Settings) -> None:
+    """Nessuna scorciatoia: si legge tutto, anche dopo un documento conforme."""
+    ocr = FakeOcrClient(texts={
+        "primo": TESTO_CONFORME,
+        "secondo": "Informativa sulla privacy",
+        "terzo": "Consenso al trattamento",
+    })
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        corpo = instance.post("/analizza-email", json=email_payload(attachments=[
+            attachment_payload("primo.pdf", make_blank_pdf()),
+            attachment_payload("secondo.pdf", make_blank_pdf()),
+            attachment_payload("terzo.pdf", make_blank_pdf()),
+        ])).json()
+
+    assert len(ocr.calls) == 3
+    assert corpo["documenti_letti"] == 3
+    assert corpo["documenti_conformi"] == 1
+    assert [d["nome"] for d in corpo["documenti"]] == ["primo.pdf", "secondo.pdf", "terzo.pdf"]

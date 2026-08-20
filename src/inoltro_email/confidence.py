@@ -182,13 +182,15 @@ def score_telemedicine(
     attachment_names: Sequence[str] = (),
     document_text: str = "",
     document_matched: bool = False,
+    documents_matched: int = 0,
 ) -> ConfidenceScore:
     """Quanto e' sicuro che il messaggio riguardi la telemedicina.
 
-    ``document_text`` e ``document_matched`` sono l'esito della lettura di
-    allegati e foto: si passano solo dopo l'OCR, cosi' la stessa funzione serve
-    sia per la stima iniziale (che decide se vale la pena chiamare l'OCR) sia
-    per il punteggio definitivo.
+    ``document_text``, ``document_matched`` e ``documents_matched`` sono
+    l'esito della lettura di allegati e foto: si passano solo dopo l'OCR, cosi'
+    la stessa funzione serve sia per la stima iniziale (che decide se vale la
+    pena chiamare l'OCR) sia per il punteggio definitivo. ``document_text`` e'
+    il testo di *tutti* i documenti letti, non solo del primo utile.
     """
     zones = _Zones(subject, body)
     accumulator = _Accumulator(settings.telemedicine_bias)
@@ -219,6 +221,12 @@ def score_telemedicine(
         )
     if document_matched:
         accumulator.add("documento con tutti i criteri", "documento", 2.5)
+    if documents_matched > 1:
+        # Piu' documenti conformi nello stesso messaggio: non e' un allegato
+        # capitato per caso.
+        accumulator.add(
+            f"{documents_matched} documenti con tutti i criteri", "documento", 0.8
+        )
 
     _apply_context(accumulator, zones, AUTOMATIC_REPLY)
 
@@ -233,6 +241,7 @@ def score_booking(
     telemedicine: ConfidenceScore,
     document_matched: bool = False,
     document_text: str = "",
+    documents_matched: int = 0,
 ) -> ConfidenceScore:
     """Quanto e' sicuro che il messaggio sia una prenotazione di telemedicina.
 
@@ -264,8 +273,26 @@ def score_booking(
     if document_matched:
         # L'impegnativa allegata con tutti i criteri e' l'indizio piu' concreto.
         accumulator.add("documento con tutti i criteri", "documento", 2.8)
+        if documents_matched > 1:
+            accumulator.add(
+                f"{documents_matched} documenti con tutti i criteri", "documento", 0.8
+            )
     elif document_text and re.search(r"\b1501a\b", normalize(document_text)):
         accumulator.add("codice 1501A nel documento letto", "documento", 1.2)
+
+    # Gli indizi di prenotazione valgono anche se stanno nell'allegato e non
+    # nel corpo: spesso il messaggio e' vuoto e dice tutto l'impegnativa.
+    if document_text:
+        documento = _TestoPiano(document_text)
+        for pattern, label, _oggetto, corpo, fuzzy_terms in BOOKING_TERMS:
+            if zones.find(pattern, fuzzy_terms, ("oggetto", "corpo"))[0] is not None:
+                continue  # gia' contato dal messaggio: non vale due volte
+            trovato, scorretta = documento.find(pattern, fuzzy_terms)
+            if trovato:
+                accumulator.add(
+                    _etichetta(f"{label} nel documento letto", "documento", scorretta),
+                    "documento", corpo * 0.6,
+                )
 
     return _build(accumulator, settings, settings.booking_threshold)
 
@@ -291,6 +318,30 @@ def _apply_context(
         if zona is None:
             continue
         accumulator.add(label, zona, weight if zona == "oggetto" else weight * body_factor)
+
+
+class _TestoPiano:
+    """Un testo senza zone: il contenuto di un documento letto dall'OCR.
+
+    Non si divide in parte scritta e parte citata come il corpo di una email -
+    un "Da:" dentro un referto e' testo del referto, non l'inizio di una
+    citazione - e i termini scritti male si cercano una volta sola.
+    """
+
+    def __init__(self, text: str) -> None:
+        self._testo = normalize(text)
+        self._scorrette = trova_termini(text)
+
+    def find(
+        self, pattern: str, fuzzy_terms: Sequence[str] = ()
+    ) -> Tuple[bool, Optional[str]]:
+        if re.search(pattern, self._testo):
+            return True, None
+        for termine in fuzzy_terms:
+            forma = self._scorrette.get(termine)
+            if forma is not None and forma != termine:
+                return True, forma
+        return False, None
 
 
 def _cerca_nel_testo(text: str) -> Tuple[Optional[str], Optional[str]]:
