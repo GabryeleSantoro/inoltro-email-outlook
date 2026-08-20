@@ -56,20 +56,24 @@ ocr:
   # Con un piano PRO si possono alzare (es. 5242880 e 999).
   max_file_bytes: 1048576
   max_pdf_pages_per_request: 3
-  # true (predefinito) = ogni documento leggibile passa dall'OCR, anche un PDF
-  # che ha gia' il proprio livello di testo: i due testi vengono uniti, perche'
-  # dentro un PDF nativo puo' esserci una scansione che solo l'OCR legge.
-  # false = il PDF con il testo non viene mandato all'OCR (meno quota consumata,
-  # ma si perde cio' che nel PDF e' solo immagine).
-  always_call: true
+  # false (predefinito) = un PDF che si riesce a leggere direttamente non passa
+  # dall'OCR: il suo livello di testo e' esatto e non costa nulla. All'OCR ci si
+  # va solo se la lettura fallisce o non produce testo utile (PDF scansionato).
+  # true = anche i PDF leggibili passano dall'OCR e i due testi vengono uniti:
+  # recupera cio' che nel PDF e' solo immagine, al prezzo di una chiamata per
+  # ogni documento.
+  always_call: false
   # true = un'immagine oltre max_file_bytes viene ridimensionata e inviata
   # comunque, invece di essere saltata. Una foto di impegnativa scattata col
   # telefono supera sempre il MB del piano gratuito.
   resize_oversized_images: true
 
 attachments:
-  allowed_extensions:
-    [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
+  # Il servizio legge solo PDF e immagini. Questo elenco puo' restringere i
+  # formati, non allargarli: un'estensione non supportata viene ignorata e
+  # segnalata nei log. Le GIF sono escluse perche' ocr.space le rifiuta (e in
+  # una email aziendale sono quasi sempre il logo animato della firma).
+  allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
   # File piu' grandi di questo vengono ignorati (byte).
   max_bytes: 10485760
   # Analizza anche le foto incorporate nel corpo (allegati inline e immagini
@@ -118,6 +122,11 @@ confidence:
   # sempre tutto. Alzandola si risparmia quota su newsletter e fogli di accessi,
   # al prezzo di non vedere il contenuto dei loro allegati.
   min_percent_for_ocr: 0
+  # Sopra questa percentuale la prenotazione e' considerata *certa*: e' cio' che
+  # fa rispondere 200 invece di 202. Deve stare sopra booking_threshold.
+  # Alzandola si risponde 200 solo ai casi lampanti, abbassandola si accettano
+  # piu' messaggi senza revisione umana.
+  certainty_threshold: 80
   # Taratura fine: sono i termini costanti dei due punteggi, in log-odds. Piu'
   # sono negativi, piu' indizi servono per arrivare a una percentuale alta.
   telemedicine_bias: -2.2

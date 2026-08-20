@@ -16,10 +16,47 @@ def attachment_from(path: Path) -> AttachmentFile:
     return AttachmentFile(path=path, original_name=path.name, size_bytes=path.stat().st_size)
 
 
-def test_pdf_con_testo_unisce_livello_di_testo_e_ocr(
+def test_pdf_con_testo_letto_senza_ocr(settings: Settings, tmp_path: Path) -> None:
+    """Prima si prova a leggere il PDF: se il testo c'e', non si chiama l'OCR."""
+    path = tmp_path / "referto.pdf"
+    path.write_bytes(make_pdf(["Richiesta di TELEVISITA codice 1501A per paziente"]))
+    ocr = FakeOcrClient()
+
+    result = TextExtractor(settings, ocr).extract(attachment_from(path))
+
+    assert result.source is TextSource.PDF_TEXT
+    assert "TELEVISITA" in result.text
+    assert ocr.calls == []
+
+
+def test_pdf_con_poco_testo_ricade_sull_ocr(settings: Settings, tmp_path: Path) -> None:
+    """Poche lettere sono il tipico PDF scansionato con la sola intestazione."""
+    path = tmp_path / "scansione.pdf"
+    path.write_bytes(make_pdf(["ASL"]))
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
+
+    result = TextExtractor(settings, ocr).extract(attachment_from(path))
+
+    assert result.source is TextSource.OCR
+    assert ocr.calls == ["scansione.pdf"]
+
+
+def test_pdf_illeggibile_va_all_ocr(settings: Settings, tmp_path: Path) -> None:
+    """PDF malformato: pypdf non ne cava nulla, ci prova l'OCR."""
+    path = tmp_path / "rotto.pdf"
+    path.write_bytes(b"%PDF-1.4\nnon sono un pdf valido")
+    ocr = FakeOcrClient(default_text="TELEVISITA 1501A")
+
+    result = TextExtractor(settings, ocr).extract(attachment_from(path))
+
+    assert result.source is TextSource.OCR
+    assert ocr.calls == ["rotto.pdf"]
+
+
+def test_pdf_con_testo_unito_all_ocr_quando_richiesto(
     settings: Settings, tmp_path: Path
 ) -> None:
-    """Il livello di testo e' esatto, l'OCR legge cio' che li' e' solo immagine."""
+    settings.ocr.always_call = True
     path = tmp_path / "referto.pdf"
     path.write_bytes(make_pdf(["Richiesta di TELEVISITA codice 1501A per paziente"]))
     ocr = FakeOcrClient(default_text="timbro e firma del medico")
@@ -30,20 +67,6 @@ def test_pdf_con_testo_unisce_livello_di_testo_e_ocr(
     assert "TELEVISITA" in result.text
     assert "timbro e firma del medico" in result.text
     assert ocr.calls == ["referto.pdf"]
-
-
-def test_pdf_con_testo_senza_ocr_quando_disattivato(
-    settings: Settings, tmp_path: Path
-) -> None:
-    settings.ocr.always_call = False
-    path = tmp_path / "referto.pdf"
-    path.write_bytes(make_pdf(["Richiesta di TELEVISITA codice 1501A per paziente"]))
-    ocr = FakeOcrClient()
-
-    result = TextExtractor(settings, ocr).extract(attachment_from(path))
-
-    assert result.source is TextSource.PDF_TEXT
-    assert ocr.calls == []
 
 
 def test_pdf_scansionato_passa_dall_ocr(settings: Settings, tmp_path: Path) -> None:

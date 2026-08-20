@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from conftest import FakeOcrClient, attachment_payload, email_payload, make_blank_pdf, make_pdf
 
 from inoltro_email.analysis import EmailAnalyzer
@@ -93,23 +94,8 @@ def test_allegato_conforme_promuove_l_email(settings: Settings) -> None:
     assert analysis.screening.terms == ["televisita"]
 
 
-def test_pdf_con_livello_di_testo_passa_comunque_dall_ocr(settings: Settings) -> None:
-    """I due testi si uniscono: il livello di testo e' esatto, l'OCR aggiunge
-    cio' che nel PDF e' solo immagine."""
-    pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
-    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
-
-    analysis, ocr = analizza(settings, payload, FakeOcrClient(default_text="timbro del medico"))
-
-    assert analysis.esito is Esito.CONFORME
-    assert ocr.calls == ["impegnativa.pdf"]
-    assert analysis.attachments[0].source is TextSource.PDF_TEXT_OCR
-    assert "TELEMEDICINA" in analysis.attachments[0].text
-    assert "timbro del medico" in analysis.attachments[0].text
-
-
-def test_pdf_con_livello_di_testo_senza_ocr_se_richiesto(settings: Settings) -> None:
-    settings.ocr.always_call = False
+def test_pdf_leggibile_non_passa_dall_ocr(settings: Settings) -> None:
+    """Se il PDF si legge da solo, l'OCR non serve: e' testo esatto e gratuito."""
     pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
     payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
 
@@ -118,6 +104,32 @@ def test_pdf_con_livello_di_testo_senza_ocr_se_richiesto(settings: Settings) -> 
     assert analysis.esito is Esito.CONFORME
     assert ocr.calls == []
     assert analysis.attachments[0].source is TextSource.PDF_TEXT
+    assert "TELEMEDICINA" in analysis.attachments[0].text
+
+
+def test_pdf_illeggibile_va_all_ocr(settings: Settings) -> None:
+    """Scansione senza livello di testo: li' l'OCR e' l'unica strada."""
+    payload = email_payload(attachments=[
+        attachment_payload("scansione.pdf", make_blank_pdf()),
+    ])
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert ocr.calls == ["scansione.pdf"]
+    assert analysis.attachments[0].source is TextSource.OCR
+
+
+def test_pdf_leggibile_unito_all_ocr_se_richiesto(settings: Settings) -> None:
+    settings.ocr.always_call = True
+    pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
+
+    analysis, ocr = analizza(settings, payload, FakeOcrClient(default_text="timbro del medico"))
+
+    assert ocr.calls == ["impegnativa.pdf"]
+    assert analysis.attachments[0].source is TextSource.PDF_TEXT_OCR
+    assert "TELEMEDICINA" in analysis.attachments[0].text
+    assert "timbro del medico" in analysis.attachments[0].text
 
 
 def test_ocr_fallito_ripiega_sul_livello_di_testo(settings: Settings) -> None:
@@ -307,3 +319,58 @@ def test_sentiment_incluso_nel_risultato(settings: Settings) -> None:
 def test_durata_registrata(settings: Settings) -> None:
     analysis, _ = analizza(settings, email_payload())
     assert analysis.duration_ms >= 0
+
+
+# --------------------------------------------------- formati non supportati
+
+
+@pytest.mark.parametrize("nome", ["accessi.xlsx", "preventivo.docx", "logo.gif", "archivio.zip"])
+def test_allegato_non_supportato_non_viene_letto(settings: Settings, nome: str) -> None:
+    """Solo PDF e immagini: il resto non arriva nemmeno all'OCR."""
+    payload = email_payload(attachments=[attachment_payload(nome, b"contenuto qualsiasi")])
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert ocr.calls == []
+    assert analysis.attachments == []
+    assert analysis.esito is Esito.SENZA_CONTENUTO
+
+
+def test_il_nome_di_un_allegato_non_letto_non_fa_computo(settings: Settings) -> None:
+    """Il caso reale: "ACCESSI IN TELEMEDICINA_Maggio.xlsx" allegato a una
+    pratica economica. Se il contenuto non si puo' leggere, il nome del file
+    non deve spostare la sicurezza del servizio."""
+    payload = email_payload(
+        subject="Variazioni economiche mese di Maggio",
+        body="Allego gli accessi del mese e il certificato di malattia.",
+        attachments=[attachment_payload("ACCESSI IN TELEMEDICINA_Maggio 2026.xlsx", b"x")],
+    )
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert ocr.calls == []
+    assert analysis.telemedicina.holds is False
+    assert not any("nome del file" in indizio.label for indizio in analysis.telemedicina.evidence)
+
+
+def test_le_gif_sono_escluse_anche_dal_corpo(settings: Settings) -> None:
+    """Il logo animato della firma non e' un documento da analizzare."""
+    payload = email_payload(attachments=[
+        attachment_payload("firma.gif", b"GIF89a", content_type="image/gif", inline=True),
+        attachment_payload("impegnativa.pdf", make_blank_pdf()),
+    ])
+
+    analysis, ocr = analizza(settings, payload)
+
+    assert ocr.calls == ["impegnativa.pdf"]
+    assert [item.name for item in analysis.attachments] == ["impegnativa.pdf"]
+
+
+def test_immagini_normali_restano_ammesse(settings: Settings) -> None:
+    payload = email_payload(attachments=[
+        attachment_payload("foto.png", b"\x89PNG finto", content_type="image/png"),
+    ])
+
+    _analysis, ocr = analizza(settings, payload)
+
+    assert ocr.calls == ["foto.png"]

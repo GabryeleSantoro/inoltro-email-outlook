@@ -4,18 +4,21 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
 **Power Automate**. Per ogni messaggio ricevuto il servizio:
 
 1. verifica che **oggetto o corpo** parlino di **telemedicina** o **televisita**;
-2. manda **tutti** gli allegati e le foto all'OCR di
-   [ocr.space](https://ocr.space/ocrapi), **restituisce il testo letto** e
+2. legge **PDF e immagini** allegati - i PDF direttamente quando hanno un
+   livello di testo, gli altri con l'OCR di
+   [ocr.space](https://ocr.space/ocrapi) - **restituisce il testo letto** e
    controlla che contenga **sia "telemedicina" sia il codice "1501A"**. Gli
    allegati possono arrivare in base64 dentro il payload oppure **come percorso
-   su disco**: in quel caso il file viene letto da dove si trova e mandato
-   all'OCR senza ricopiarlo. Le immagini troppo grandi per l'API vengono
-   **ridimensionate**, non scartate;
+   su disco**. Le immagini troppo grandi per l'API vengono **ridimensionate**,
+   non scartate;
 3. restituisce due **percentuali di sicurezza**: quanto e' sicuro che il
    messaggio riguardi la **telemedicina** e quanto e' sicuro che sia una
    **prenotazione** di telemedicina, con l'elenco degli indizi che le hanno
    determinate;
 4. calcola un **punteggio di sentiment** del messaggio.
+
+Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
+prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
 
 La risposta e' un JSON che il flusso Power Automate puo' usare per decidere cosa
 fare: inoltrare, aprire una pratica, rispondere al paziente o ignorare. Il
@@ -32,22 +35,25 @@ Power Automate (nuova email)  --POST /analizza-email-->  servizio
                                        |                                          |
                                        +--------------------+---------------------+
                                                             |
-                                        tutti gli allegati e le foto del corpo
-                                                            |
-                              PDF con livello di testo --> pypdf  --+
-                              immagine oltre 1 MB --> ridimensionata |
-                                                            |        |
-                                            ocr.space (POST /parse/image)
-                                                            |        |
-                                                    testi uniti <----+
-                                                            |
-                                      criteri: "telemedicina" AND "1501A"
-                                          su ogni documento, poi riassunti
-                                                            |
-                                    percentuali: telemedicina + prenotazione
-                                              + sentiment
-                                                            |
-                                        risposta JSON (con il testo letto)
+                                   allegati: solo PDF e immagini
+                              (fogli di calcolo, Word, GIF: esclusi qui)
+                                                  |
+                        PDF leggibile? --si--> pypdf, niente OCR
+                                |no
+                                v
+                        immagine oltre 1 MB --> ridimensionata
+                                |
+                                v
+                        ocr.space (POST /parse/image)
+                                                  |
+                            criteri: "telemedicina" AND "1501A"
+                                su ogni documento, poi riassunti
+                                                  |
+                          percentuali: telemedicina + prenotazione
+                                    + sentiment
+                                                  |
+                    200 se prenotazione certa, altrimenti 202
+                        (il verdetto e' nel corpo in entrambi i casi)
 ```
 
 Alcune scelte di funzionamento:
@@ -69,18 +75,26 @@ Alcune scelte di funzionamento:
   un messaggio dall'oggetto generico. Un'impegnativa allegata a un'email che
   dice solo "in allegato quanto richiesto" e' esattamente il caso che si vuole
   riconoscere.
-- **Un PDF con il testo passa lo stesso dall'OCR**: il livello di testo e'
-  esatto dove c'e', l'OCR recupera cio' che nel PDF e' solo immagine (timbri,
-  firme, moduli scansionati incollati in un PDF nativo). I due testi vengono
-  uniti e la sorgente risulta `pdf_text+ocr`.
+- **Il PDF si legge da solo, quando puo'.** Se ha un livello di testo, quello
+  e' il testo del documento: esatto, immediato, senza consumare quota. All'OCR
+  ci si va solo quando la lettura fallisce o non produce testo utile, cioe'
+  quando il PDF e' una scansione.
+- **Solo PDF e immagini.** Fogli di calcolo, documenti Word e archivi non
+  vengono aperti: non c'e' modo di ricavarne testo con l'OCR. Non compaiono fra
+  i documenti della risposta e **non entrano in nessun conteggio**: un file
+  chiamato `ACCESSI IN TELEMEDICINA_Maggio.xlsx` non sposta di un punto la
+  sicurezza del servizio, visto che il suo contenuto resta illeggibile. Le
+  **GIF** sono escluse anche se immagini: ocr.space le rifiuta, e in una email
+  aziendale sono quasi sempre il logo animato della firma.
 - **Le immagini grandi si riducono, non si perdono**: una foto di impegnativa
   scattata col telefono supera sempre il MB del piano gratuito. Viene scalata
   per gradi finche' non rientra, conservando la risoluzione piu' alta possibile
   perche' i caratteri restino leggibili.
-- **Chi vuole risparmiare quota puo' ancora farlo**: `ocr.always_call: false`,
-  `attachments.analyze_all: false`, `screening.stop_on_failure: true` e
-  `confidence.min_percent_for_ocr` riportano il servizio al comportamento
-  parsimonioso, al prezzo di vedere meno dati.
+- **Chi vuole leggere di piu' o spendere di meno puo' regolarlo**:
+  `ocr.always_call: true` manda all'OCR anche i PDF gia' leggibili (recupera i
+  timbri, costa una chiamata a documento); `attachments.analyze_all: false`,
+  `screening.stop_on_failure: true` e `confidence.min_percent_for_ocr`
+  riportano il servizio al comportamento parsimonioso.
 - **Le foto del corpo contano**: spesso l'impegnativa e' fotografata e incollata
   nel messaggio. Vengono riconosciute sia come allegati `isInline`, sia come
   immagini `<img src="data:image/...;base64,...">` dentro l'HTML.
@@ -146,13 +160,14 @@ Le voci da rivedere subito:
 | `attachments.analyze_all` | `true` legge tutti i file, `false` si ferma al primo conforme |
 | `attachments.return_text` | restituisci nella risposta il testo letto dai documenti |
 | `attachments.max_text_chars` | quanto testo restituire per documento (`0` = tutto) |
-| `ocr.always_call` | `true` manda all'OCR anche i PDF che hanno gia' il testo |
+| `ocr.always_call` | `true` manda all'OCR anche i PDF che si leggono da soli |
 | `ocr.resize_oversized_images` | ridimensiona le immagini oltre `ocr.max_file_bytes` invece di saltarle |
 | `local_files.enabled` | leggi gli allegati indicati per percorso (campo `attchment`) |
 | `local_files.allowed_directories` | cartelle da cui e' lecito leggere: da riempire se il servizio e' raggiungibile in rete |
 | `local_files.search_directories` | dove cercare il file per nome se il percorso non esiste |
 | `confidence.telemedicine_threshold` | sopra questa percentuale il messaggio "e' telemedicina" |
 | `confidence.booking_threshold` | sopra questa percentuale "e' una prenotazione" |
+| `confidence.certainty_threshold` | sopra questa percentuale la prenotazione e' *certa*: e' cio' che fa rispondere `200` |
 | `confidence.min_percent_for_ocr` | sotto questa percentuale non si chiama l'OCR |
 | `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" (punteggio storico, da `0` a `1`) |
 | `api.host` / `api.port` | dove ascolta il servizio (le variabili `API_HOST` e `PORT` hanno la precedenza) |
@@ -235,6 +250,7 @@ nelle cartelle di `local_files.search_directories`.
   "esito": "conforme",
   "conforme": true,
   "prenotazione_telemedicina": true,
+  "prenotazione_certa": true,
   "telemedicina": {
     "percentuale": 99.9,
     "livello": "molto alta",
@@ -327,12 +343,14 @@ Valori possibili di `esito`:
 
 ### I documenti letti
 
-`documenti` elenca **tutti** gli allegati e le foto analizzati, in ordine di
-arrivo: il servizio non si ferma al primo utile.
+`documenti` elenca **tutti** gli allegati analizzati, in ordine di arrivo: il
+servizio non si ferma al primo utile. Compaiono solo PDF e immagini; ogni altro
+formato viene escluso a monte, non entra nell'elenco e non influenza le
+percentuali.
 
 | Campo | Significato |
 |---|---|
-| `sorgente` | `pdf_text+ocr` livello di testo del PDF unito alla lettura OCR; `ocr` solo OCR; `pdf_text` solo livello di testo (con `ocr.always_call: false`); `skipped` non leggibile; `error` lettura fallita |
+| `sorgente` | `pdf_text` letto direttamente dal PDF, senza OCR; `ocr` letto da ocr.space; `pdf_text+ocr` i due testi uniti (con `ocr.always_call: true`); `skipped` non leggibile; `error` lettura fallita |
 | `testo` | il testo letto, troncato a `attachments.max_text_chars`. Si esclude con `attachments.return_text: false` |
 | `nota` | cosa e' stato fatto al file prima di leggerlo, oggi il ridimensionamento di un'immagine troppo grande |
 | `conforme` | questo singolo documento contiene **tutti** i criteri |
@@ -356,6 +374,7 @@ rispondono a due domande diverse:
 | `telemedicina` | il messaggio riguarda la telemedicina? | `confidence.telemedicine_threshold` |
 | `prenotazione` | e' la prenotazione di una prestazione di telemedicina? | `confidence.booking_threshold` |
 | `prenotazione_telemedicina` | verdetto unico: entrambe sopra soglia | - |
+| `prenotazione_certa` | prenotazione oltre la soglia di *certezza*: fa rispondere `200` | `confidence.certainty_threshold` |
 
 Ogni indizio vale un peso: si sommano e la somma diventa una percentuale. Sono
 tutti riportati in `indizi_a_favore` e `indizi_contrari`, con il punto del
@@ -405,10 +424,39 @@ lettura, allegati indicati per percorso ma non trovati, corpo non risolto dal
 flusso (`Unknown Property 'HtmlBody'`). L'analisi va avanti lo stesso, ma sono
 il segnale che il flusso Power Automate va corretto a monte.
 
-Codici di stato: `200` analisi eseguita (anche quando l'email non e' conforme),
-`400` payload non interpretabile, `401` chiave assente o errata, `413` richiesta
-oltre `api.max_request_bytes`. Gli errori hanno la forma
-`{"errore": "...", "codice": 400}`.
+### Codici di stato
+
+Il codice dice l'esito senza bisogno di leggere il corpo:
+
+| Codice | Significato |
+|---|---|
+| `200` | **e' una prenotazione di telemedicina**, con sicurezza oltre `confidence.certainty_threshold` |
+| `202` | messaggio analizzato: non e' una prenotazione, o non lo e' con sicurezza sufficiente |
+| `400` | payload non interpretabile nemmeno dopo le riparazioni |
+| `401` | chiave assente o errata nell'header `X-API-Key` |
+| `413` | richiesta oltre `api.max_request_bytes` |
+
+`200` e `202` portano **entrambi** il verdetto completo nel corpo: il `202` non
+e' un errore, e' l'esito "analizzato, non e' una prenotazione". Gli errori veri
+hanno invece la forma `{"errore": "...", "codice": 400}`.
+
+Sono due codici `2xx` per una ragione pratica: **Power Automate considera
+fallita l'azione HTTP davanti a un `4xx`**. Usare un codice di errore per dire
+"non e' una prenotazione" manderebbe il flusso in errore e, con i tentativi
+automatici attivi, farebbe rianalizzare lo stesso messaggio consumando altra
+quota OCR.
+
+Nel flusso si distinguono cosi':
+
+```
+outputs('HTTP')['statusCode'] uguale a 200   ->  e' una prenotazione, si procede
+```
+
+La soglia si sposta con `confidence.certainty_threshold` (predefinita `80`).
+Misurata sui messaggi reali, separa nettamente: una richiesta esplicita di
+prenotazione sta sopra il 96%, una richiesta generica di televisita al 63%, un
+rinnovo di piano terapeutico al 73%, un'apertura di agenda al 13%. Chi vuole
+che anche i casi intermedi passino senza revisione umana la abbassa.
 
 ## Il flusso Power Automate
 
@@ -465,10 +513,17 @@ oltre `api.max_request_bytes`. Gli errori hanno la forma
      > senza, chiunque possa chiamare l'endpoint sceglie quali file del disco
      > (fra quelli con estensione ammessa) finiscono all'OCR. All'avvio il
      > servizio lo segnala nei log.
-3. **Condizione** sul risultato. Il campo da guardare dipende dalla domanda:
-   - `body('HTTP')?['prenotazione_telemedicina']` uguale a `true` -> e' una
-     richiesta di prenotazione di telemedicina (le due percentuali sono
-     entrambe sopra soglia);
+3. **Condizione** sul risultato. Il modo piu' diretto e' il codice di stato:
+   `outputs('HTTP')['statusCode']` uguale a `200` significa "e' certamente una
+   prenotazione di telemedicina". Attenzione: nell'azione HTTP va disattivato
+   *"Considera come esito negativo"* per i codici diversi da 200, altrimenti il
+   `202` interrompe il flusso.
+
+   Se servono distinzioni piu' fini, i campi del corpo restano disponibili:
+   - `body('HTTP')?['prenotazione_certa']` -> lo stesso verdetto del `200`;
+   - `body('HTTP')?['prenotazione_telemedicina']` -> prenotazione probabile,
+     sopra la soglia di conferma ma non necessariamente di certezza: e' il
+     gruppo da far guardare a una persona;
    - `body('HTTP')?['telemedicina']?['percentuale']` maggiore di `70` -> riguarda
      la telemedicina, a qualunque titolo;
    - `body('HTTP')?['conforme']` uguale a `true` -> un allegato contiene tutti i
