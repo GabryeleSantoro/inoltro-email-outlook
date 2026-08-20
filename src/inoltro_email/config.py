@@ -100,6 +100,41 @@ class AttachmentSettings:
 
 
 @dataclass
+class LocalFileSettings:
+    """Allegati passati come percorso su disco invece che in base64.
+
+    Il flusso Power Automate salva gli allegati in una cartella e nel payload
+    manda solo il percorso (campo ``attchment``). Il servizio legge i file da
+    li' e li manda all'OCR senza ricopiarli.
+    """
+
+    enabled: bool = True
+    # Se valorizzato, si accettano solo percorsi dentro queste cartelle: evita
+    # che un payload malevolo faccia leggere un file qualsiasi della macchina.
+    allowed_directories: List[Path] = field(default_factory=list)
+    # Dove cercare il file per nome quando il percorso indicato non esiste
+    # (utile se il servizio gira su una macchina diversa dal flusso).
+    search_directories: List[Path] = field(default_factory=list)
+
+
+@dataclass
+class ConfidenceSettings:
+    """Soglie e taratura delle percentuali di sicurezza."""
+
+    # Sopra questa percentuale il messaggio e' considerato di telemedicina.
+    telemedicine_threshold: float = 50.0
+    # Sopra questa percentuale e' considerato una prenotazione di telemedicina.
+    booking_threshold: float = 60.0
+    # Sotto questa percentuale (calcolata prima dell'OCR, su oggetto, corpo e
+    # nomi dei file) non si spende una chiamata all'OCR.
+    min_percent_for_ocr: float = 25.0
+    # Termini costanti dei due punteggi: piu' sono negativi, piu' servono
+    # indizi per arrivare a una percentuale alta.
+    telemedicine_bias: float = -2.2
+    booking_bias: float = -3.2
+
+
+@dataclass
 class SentimentSettings:
     """Soglie del punteggio di sentiment e di intento di prenotazione."""
 
@@ -123,6 +158,8 @@ class Settings:
     rules: RuleSettings = field(default_factory=RuleSettings)
     ocr: OcrSettings = field(default_factory=OcrSettings)
     attachments: AttachmentSettings = field(default_factory=AttachmentSettings)
+    local_files: LocalFileSettings = field(default_factory=LocalFileSettings)
+    confidence: ConfidenceSettings = field(default_factory=ConfidenceSettings)
     sentiment: SentimentSettings = field(default_factory=SentimentSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
 
@@ -185,6 +222,8 @@ class Settings:
         rules_raw = section("rules")
         ocr_raw = section("ocr")
         att_raw = section("attachments")
+        local_raw = section("local_files")
+        confidence_raw = section("confidence")
         sentiment_raw = section("sentiment")
         log_raw = section("logging")
 
@@ -226,6 +265,32 @@ class Settings:
             max_files=int(att_raw.get("max_files", AttachmentSettings.max_files)),
             analyze_all=bool(att_raw.get("analyze_all", False)),
         )
+        local_files = LocalFileSettings(
+            enabled=bool(local_raw.get("enabled", True)),
+            allowed_directories=[
+                Path(item) for item in _as_str_list(local_raw.get("allowed_directories"), [])
+            ],
+            search_directories=[
+                Path(item) for item in _as_str_list(local_raw.get("search_directories"), [])
+            ],
+        )
+        confidence = ConfidenceSettings(
+            telemedicine_threshold=float(
+                confidence_raw.get("telemedicine_threshold", ConfidenceSettings.telemedicine_threshold)
+            ),
+            booking_threshold=float(
+                confidence_raw.get("booking_threshold", ConfidenceSettings.booking_threshold)
+            ),
+            min_percent_for_ocr=float(
+                confidence_raw.get("min_percent_for_ocr", ConfidenceSettings.min_percent_for_ocr)
+            ),
+            telemedicine_bias=float(
+                confidence_raw.get("telemedicine_bias", ConfidenceSettings.telemedicine_bias)
+            ),
+            booking_bias=float(
+                confidence_raw.get("booking_bias", ConfidenceSettings.booking_bias)
+            ),
+        )
         sentiment = SentimentSettings(
             positive_threshold=float(
                 sentiment_raw.get("positive_threshold", SentimentSettings.positive_threshold)
@@ -251,6 +316,8 @@ class Settings:
             rules=rules,
             ocr=ocr,
             attachments=attachments,
+            local_files=local_files,
+            confidence=confidence,
             sentiment=sentiment,
             logging=logging_settings,
         )
@@ -283,6 +350,16 @@ class Settings:
             raise ConfigError("attachments.max_bytes deve essere > 0.")
         if self.attachments.max_files < 1:
             raise ConfigError("attachments.max_files deve essere >= 1.")
+        for name, value in (
+            ("telemedicine_threshold", self.confidence.telemedicine_threshold),
+            ("booking_threshold", self.confidence.booking_threshold),
+            ("min_percent_for_ocr", self.confidence.min_percent_for_ocr),
+        ):
+            if not 0.0 <= value <= 100.0:
+                raise ConfigError(f"confidence.{name} deve stare fra 0 e 100.")
+        for directory in self.local_files.allowed_directories + self.local_files.search_directories:
+            if not str(directory).strip():
+                raise ConfigError("I percorsi in 'local_files' non possono essere vuoti.")
         if not 0.0 <= self.sentiment.booking_threshold <= 1.0:
             raise ConfigError("sentiment.booking_threshold deve stare fra 0 e 1.")
         if self.sentiment.negative_threshold > self.sentiment.positive_threshold:

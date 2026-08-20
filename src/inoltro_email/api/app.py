@@ -17,7 +17,7 @@ import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -29,6 +29,7 @@ from ..config import Settings
 from ..inbound import InboundError, parse_email
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
+from ..rawjson import RawJsonError, loads_tolerant
 from .responses import analysis_to_dict
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,15 @@ logger = logging.getLogger(__name__)
 API_KEY_HEADER = "X-API-Key"
 # 413: il nome della costante e' cambiato fra le versioni di Starlette.
 RICHIESTA_TROPPO_GRANDE = 413
+
+# Il flusso in produzione manda gli allegati come percorsi su disco: la forma
+# e' diversa da quella del connettore Outlook, il servizio le accetta entrambe.
+RICHIESTA_ESEMPIO_PERCORSI = {
+    "subject": "R: Agende telemedicina DSB 68 - ORTOPEDIA",
+    "body": "<html><body><p>Si invia l'impegnativa per la televisita.</p></body></html>",
+    "date": "08/20/2026 10:26",
+    "attchment": "C:\\Users\\user\\Documents\\Power Automate\\Allegati\\image.png",
+}
 
 RICHIESTA_ESEMPIO = {
     "id": "AAMkAGI2...",
@@ -91,6 +101,23 @@ def create_app(
             " / ".join(settings.screening.keywords),
             " + ".join(settings.rules.keywords + settings.rules.codes),
         )
+        logger.info(
+            "Sicurezza: telemedicina dal %.0f%%, prenotazione dal %.0f%%, "
+            "OCR solo sopra il %.0f%%.",
+            settings.confidence.telemedicine_threshold,
+            settings.confidence.booking_threshold,
+            settings.confidence.min_percent_for_ocr,
+        )
+        if settings.local_files.enabled and not settings.local_files.allowed_directories:
+            # I file indicati nel payload vengono caricati su ocr.space: senza
+            # un elenco di cartelle ammesse, chi puo' chiamare il servizio
+            # sceglie quali file della macchina ci finiscono.
+            logger.warning(
+                "Allegati per percorso attivi senza 'local_files.allowed_directories': "
+                "qualunque file del disco con estensione ammessa puo' essere letto e "
+                "inviato a ocr.space. Se il servizio non e' solo in locale, indicare "
+                "le cartelle consentite."
+            )
         try:
             yield
         finally:
@@ -157,6 +184,10 @@ def create_app(
                     "application/json": {
                         "schema": {"type": "object"},
                         "example": RICHIESTA_ESEMPIO,
+                        "examples": {
+                            "allegati_in_base64": {"value": RICHIESTA_ESEMPIO},
+                            "allegati_per_percorso": {"value": RICHIESTA_ESEMPIO_PERCORSI},
+                        },
                     }
                 },
             }
@@ -167,13 +198,14 @@ def create_app(
         x_api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER),
     ) -> JSONResponse:
         _check_api_key(settings, x_api_key)
-        payload = await _read_json(request, settings.api.max_request_bytes)
+        payload, repairs = await _read_json(request, settings.api.max_request_bytes)
 
         try:
             email = parse_email(
                 payload,
                 include_inline_images=settings.attachments.include_inline_images,
                 max_attachment_bytes=settings.attachments.max_bytes,
+                local_files=settings.local_files,
             )
         except InboundError as exc:
             logger.error(
@@ -182,6 +214,13 @@ def create_app(
                 _payload_to_log(payload),
             )
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        if repairs:
+            # Il payload e' stato accettato ma era da riparare: chi legge la
+            # risposta deve poterlo sapere e correggere il flusso a monte.
+            email.warnings.append(
+                "JSON non valido riparato in lettura: " + "; ".join(repairs)
+            )
 
         logger.info(
             "Richiesta di analisi: '%s' da %s, %d file.",
@@ -223,8 +262,13 @@ def _constant_time_equals(left: str, right: str) -> bool:
     return hmac.compare_digest(left, right)
 
 
-async def _read_json(request: Request, max_bytes: int) -> Any:
-    """Legge il corpo della richiesta rispettando il limite configurato."""
+async def _read_json(request: Request, max_bytes: int) -> Tuple[Any, List[str]]:
+    """Legge il corpo della richiesta e lo interpreta.
+
+    Restituisce ``(payload, riparazioni)``: il JSON del flusso arriva quasi
+    sempre non valido (vedi ``rawjson``), viene letto lo stesso e le riparazioni
+    applicate risalgono fino alla risposta.
+    """
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > max_bytes:
         raise HTTPException(
@@ -241,15 +285,27 @@ async def _read_json(request: Request, max_bytes: int) -> Any:
     if not raw.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Corpo della richiesta vuoto.")
 
+    raw_text = raw.decode("utf-8", errors="replace")
     try:
-        return json.loads(raw)
-    except (ValueError, UnicodeDecodeError) as exc:
-        raw_text = raw.decode("utf-8", errors="replace")
+        payload, repairs = loads_tolerant(raw_text)
+    except RawJsonError as exc:
         logger.error(
-            "JSON non valido: %s\nPayload completo (raw):\n%s",
+            "JSON non interpretabile: %s\nPayload completo (raw):\n%s",
             exc,
             raw_text,
         )
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail=f"JSON non valido: {exc}"
         ) from exc
+
+    if repairs:
+        # Power Automate costruisce il JSON concatenando stringhe: a capo,
+        # virgolette degli attributi HTML e percorsi Windows lo rendono non
+        # valido. Si legge lo stesso, ma resta a verbale.
+        logger.warning(
+            "JSON non valido riparato in lettura (%s). "
+            "Conviene correggere il flusso Power Automate a monte.",
+            "; ".join(repairs),
+        )
+        logger.debug("Payload riparato (raw):\n%s", raw_text)
+    return payload, repairs

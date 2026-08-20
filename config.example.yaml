@@ -67,6 +67,41 @@ attachments:
   # true  = si leggono comunque tutti i file, utile per diagnosticare
   analyze_all: false
 
+# Allegati che il flusso non manda in base64 ma indica con il percorso su disco
+# (campo "attchment" del payload). Quei percorsi sono la base per l'OCR: il file
+# viene letto da dove si trova, senza ricopiarlo.
+local_files:
+  enabled: true
+  # Se valorizzato, si accettano SOLO percorsi dentro queste cartelle. Da
+  # riempire quando il servizio e' raggiungibile da altre macchine: evita che un
+  # payload possa far leggere un file qualsiasi del disco.
+  # allowed_directories:
+  #   - "C:/Users/user/Documents/Power Automate/Allegati"
+  # Dove cercare il file per nome se il percorso indicato non esiste (serve se
+  # il servizio gira su una macchina diversa da quella del flusso).
+  # search_directories:
+  #   - "/srv/allegati"
+  allowed_directories: []
+  search_directories: []
+
+# Percentuali di sicurezza restituite nella risposta.
+confidence:
+  # Sopra questa percentuale il messaggio e' considerato di telemedicina
+  # ("telemedicina.confermato" nella risposta).
+  telemedicine_threshold: 50
+  # Sopra questa percentuale e' considerato una prenotazione di telemedicina.
+  # Insieme alla precedente determina "prenotazione_telemedicina".
+  booking_threshold: 60
+  # Sotto questa percentuale, calcolata prima dell'OCR su oggetto, corpo e nomi
+  # dei file, non si spende una chiamata all'OCR: e' cio' che ferma newsletter,
+  # fogli di accessi e messaggi in cui "telemedicina" e' solo il nome della
+  # casella in copia.
+  min_percent_for_ocr: 25
+  # Taratura fine: sono i termini costanti dei due punteggi, in log-odds. Piu'
+  # sono negativi, piu' indizi servono per arrivare a una percentuale alta.
+  telemedicine_bias: -2.2
+  booking_bias: -3.2
+
 sentiment:
   # Sopra questo punteggio l'etichetta e' "positivo", sotto negative_threshold
   # e' "negativo", in mezzo "neutro". Il punteggio va da -1 a +1.

@@ -13,6 +13,15 @@ e Microsoft Graph, quindi qui si accettano entrambe le forme:
 Le foto incorporate nel corpo arrivano in due modi diversi e vengono
 riconosciute entrambe: come allegati con ``isInline: true`` e come immagini
 ``<img src="data:image/png;base64,...">`` dentro l'HTML.
+
+Un terzo modo lo usa il flusso in produzione: gli allegati vengono salvati in
+una cartella e nel payload arriva soltanto il percorso, sotto la chiave
+``attchment`` (scritta cosi', senza la "a")::
+
+    "attchment":"C:\\Users\\user\\Documents\\Power Automate\\Allegati\\image.png"
+
+Quei percorsi sono la base per l'OCR: il file viene letto da dove si trova e
+mandato a ocr.space senza ricopiarlo.
 """
 
 from __future__ import annotations
@@ -23,8 +32,10 @@ import logging
 import re
 from html import unescape
 from html.parser import HTMLParser
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from pathlib import Path, PureWindowsPath
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+from .config import LocalFileSettings
 from .models import InboundAttachment, InboundEmail, Origine
 
 logger = logging.getLogger(__name__)
@@ -52,6 +63,18 @@ _BLOCK_TAGS = {
 }
 _SKIPPED_TAGS = {"script", "style", "head", "title"}
 
+# Chiavi sotto cui il flusso puo' mandare i percorsi degli allegati salvati su
+# disco. "attchment" e' scritto cosi' nel flusso attuale: si accetta com'e'.
+PATH_KEYS = ("attchment", "attachment", "attachmentPath", "attachmentPaths",
+             "allegato", "allegati", "percorso", "percorsi", "filePath")
+
+# Il flusso, quando non riesce a risolvere un'espressione, manda il testo
+# dell'errore al posto del corpo: va segnalato, non analizzato.
+_UNRESOLVED_BODY = re.compile(
+    r"^\s*(unknown property|expression evaluation failed|invalidtemplate)\b",
+    re.IGNORECASE,
+)
+
 
 class InboundError(ValueError):
     """Payload non interpretabile: manca un campo o il base64 e' rotto."""
@@ -62,11 +85,17 @@ def parse_email(
     *,
     include_inline_images: bool = True,
     max_attachment_bytes: Optional[int] = None,
+    local_files: Optional[LocalFileSettings] = None,
 ) -> InboundEmail:
-    """Costruisce un ``InboundEmail`` dal JSON ricevuto da Power Automate."""
+    """Costruisce un ``InboundEmail`` dal JSON ricevuto da Power Automate.
+
+    ``local_files`` abilita e delimita la lettura degli allegati indicati per
+    percorso; se non viene passato si usano le impostazioni predefinite.
+    """
     if not isinstance(payload, Mapping):
         raise InboundError("Il corpo della richiesta deve essere un oggetto JSON.")
 
+    warnings: List[str] = []
     data = _CaseInsensitive(payload)
     body_raw, is_html = _read_body(data)
 
@@ -81,10 +110,28 @@ def parse_email(
     if not subject and not body_text.strip():
         raise InboundError("Il messaggio non contiene ne' oggetto ne' corpo: nulla da analizzare.")
 
+    if _UNRESOLVED_BODY.match(body_text):
+        # Es. "Unknown Property 'HtmlBody'": il corpo non e' arrivato. Si
+        # analizza comunque l'oggetto, ma il flusso va corretto a monte.
+        warnings.append(
+            f"Corpo non risolto dal flusso Power Automate ({body_text.strip()[:80]}): "
+            "l'analisi si basa solo su oggetto e allegati."
+        )
+        logger.warning("Corpo non risolto dal flusso: %s", body_text.strip()[:120])
+        body_text = ""
+
     attachments = _read_attachments(
         data.get("attachments"),
         include_inline_images=include_inline_images,
         max_attachment_bytes=max_attachment_bytes,
+    )
+    attachments.extend(
+        _read_path_attachments(
+            data,
+            settings=local_files or LocalFileSettings(),
+            max_attachment_bytes=max_attachment_bytes,
+            warnings=warnings,
+        )
     )
     if include_inline_images:
         attachments.extend(
@@ -99,8 +146,11 @@ def parse_email(
         message_id=_as_text(data.get("id") or data.get("messageId")),
         internet_message_id=_as_text(data.get("internetMessageId") or data.get("messageId")),
         sender=_read_sender(data),
-        received_at=_as_text(data.get("receivedDateTime") or data.get("received")),
+        received_at=_as_text(
+            data.get("receivedDateTime") or data.get("received") or data.get("date")
+        ),
         attachments=attachments,
+        warnings=warnings,
     )
 
 
@@ -276,6 +326,139 @@ def _read_attachments(
             )
         )
     return attachments
+
+
+# --------------------------------------------- allegati indicati per percorso
+
+
+def _read_path_attachments(
+    data: "_CaseInsensitive",
+    *,
+    settings: LocalFileSettings,
+    max_attachment_bytes: Optional[int],
+    warnings: List[str],
+) -> List[InboundAttachment]:
+    """Legge gli allegati che il payload indica solo con il percorso su disco."""
+    raw_values: List[Any] = []
+    for key in PATH_KEYS:
+        value = data.get(key)
+        if value not in (None, "", []):
+            raw_values.append(value)
+    if not raw_values:
+        return []
+
+    candidates = _split_paths(raw_values)
+    if not candidates:
+        return []
+
+    if not settings.enabled:
+        message = (
+            f"{len(candidates)} allegato/i indicato/i per percorso non letto/i: "
+            "lettura dei file locali disattivata (local_files.enabled)."
+        )
+        logger.info(message)
+        warnings.append(message)
+        return []
+
+    attachments: List[InboundAttachment] = []
+    for raw_path in candidates:
+        resolved, problem = _resolve_local_path(raw_path, settings)
+        if resolved is None:
+            logger.warning("Allegato '%s' non leggibile: %s", raw_path, problem)
+            warnings.append(f"Allegato '{raw_path}' non letto: {problem}.")
+            continue
+
+        size = resolved.stat().st_size
+        if max_attachment_bytes is not None and size > max_attachment_bytes:
+            message = f"{size} byte oltre il limite di {max_attachment_bytes}"
+            logger.info("Allegato '%s' ignorato: %s.", resolved, message)
+            warnings.append(f"Allegato '{resolved.name}' non letto: {message}.")
+            continue
+
+        logger.info("Allegato da percorso: %s (%d byte).", resolved, size)
+        attachments.append(
+            InboundAttachment(
+                name=resolved.name,
+                content_type="",
+                origine=Origine.ALLEGATO,
+                source_path=resolved,
+            )
+        )
+    return attachments
+
+
+def _split_paths(values: Sequence[Any]) -> List[str]:
+    """Appiattisce elenchi e stringhe multiriga in un elenco di percorsi."""
+    paths: List[str] = []
+    for value in _flatten(values):
+        text = _as_text(value)
+        if not text:
+            continue
+        for line in text.replace("\r\n", "\n").split("\n"):
+            candidate = line.strip().strip('"').strip("'").rstrip(";").strip()
+            if candidate and candidate not in paths:
+                paths.append(candidate)
+    return paths
+
+
+def _flatten(values: Iterable[Any]) -> Iterable[Any]:
+    for value in values:
+        if isinstance(value, (list, tuple)):
+            yield from _flatten(value)
+        else:
+            yield value
+
+
+def _resolve_local_path(
+    raw_path: str,
+    settings: LocalFileSettings,
+) -> Tuple[Optional[Path], str]:
+    """Trova il file indicato dal payload; ``(None, motivo)`` se non ci riesce.
+
+    Il percorso arriva nella forma Windows del flusso. Si prova prima cosi'
+    com'e' (servizio e flusso sulla stessa macchina, il caso normale), poi si
+    cerca il file per nome nelle cartelle configurate: cosi' lo stesso payload
+    funziona anche se il servizio gira altrove.
+    """
+    candidate = Path(raw_path)
+    filename = PureWindowsPath(raw_path).name or candidate.name
+
+    found: Optional[Path] = None
+    try:
+        if candidate.is_file():
+            found = candidate
+    except OSError as exc:  # percorso non valido per il sistema operativo locale
+        logger.debug("Percorso '%s' non utilizzabile su questo sistema: %s", raw_path, exc)
+
+    if found is None and filename:
+        for directory in settings.search_directories:
+            alternative = Path(directory) / filename
+            if alternative.is_file():
+                logger.info("'%s' ritrovato in %s.", filename, directory)
+                found = alternative
+                break
+
+    if found is None:
+        return None, "file non trovato sul disco del servizio"
+
+    try:
+        resolved = found.resolve()
+    except OSError as exc:
+        return None, f"percorso non risolvibile ({exc})"
+
+    if settings.allowed_directories and not _inside_any(resolved, settings.allowed_directories):
+        return None, "percorso fuori dalle cartelle consentite (local_files.allowed_directories)"
+    return resolved, ""
+
+
+def _inside_any(path: Path, directories: Sequence[Path]) -> bool:
+    for directory in directories:
+        try:
+            path.relative_to(Path(directory).resolve())
+            return True
+        except (ValueError, OSError):
+            continue
+    return False
 
 
 def _is_inline(entry: "_CaseInsensitive") -> bool:

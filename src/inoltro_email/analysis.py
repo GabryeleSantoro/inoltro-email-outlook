@@ -3,14 +3,21 @@
 Il flusso, per ogni messaggio che arriva da Power Automate:
 
     screening su oggetto e corpo (telemedicina / televisita)
+        -> percentuale di sicurezza "e' telemedicina?" prima dell'OCR
         -> OCR degli allegati e delle foto incorporate nel corpo
         -> verifica dei criteri sul testo letto (telemedicina + 1501A)
-        -> punteggio di sentiment e di intento di prenotazione
+        -> percentuali definitive: telemedicina e prenotazione di telemedicina
+        -> punteggio di sentiment
 
-Lo screening viene prima apposta: se l'email non parla di telemedicina non si
-spende nemmeno una chiamata all'OCR. Il modulo non conosce HTTP: riceve un
-``InboundEmail`` e restituisce un ``EmailAnalysis``, quindi e' interamente
-collaudabile senza far partire il server.
+La sicurezza si calcola due volte apposta. La prima, su oggetto, corpo e nomi
+dei file, decide se vale la pena spendere una chiamata all'OCR: una newsletter
+o un foglio di accessi mensili che nomina la telemedicina di sfuggita si ferma
+qui. La seconda tiene conto anche di cio' che l'OCR ha letto negli allegati,
+che e' l'indizio piu' concreto di tutti.
+
+Il modulo non conosce HTTP: riceve un ``InboundEmail`` e restituisce un
+``EmailAnalysis``, quindi e' interamente collaudabile senza far partire il
+server.
 """
 
 from __future__ import annotations
@@ -23,10 +30,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from .config import Settings
+from .confidence import score_booking, score_telemedicine
 from .matching import evaluate, screen
 from .models import (
-    AttachmentAnalysis, AttachmentFile, EmailAnalysis, Esito, InboundAttachment,
-    InboundEmail, MatchReport, Origine, ScreeningReport, SentimentScore, TextSource,
+    AttachmentAnalysis, AttachmentFile, ConfidenceScore, EmailAnalysis, Esito,
+    InboundAttachment, InboundEmail, MatchReport, Origine, ScreeningReport,
+    SentimentScore, TextSource,
 )
 from .ocr.extractor import TextExtractor
 from .sentiment import analyze_sentiment
@@ -71,34 +80,77 @@ class EmailAnalyzer:
             ", ".join(screening.terms) or "-",
         )
 
-        if not screening.passed and self._settings.screening.stop_on_failure:
+        # Prima stima, senza OCR: serve a decidere se spendere una chiamata.
+        preliminary = self._telemedicine_confidence(email)
+        logger.info(
+            "Sicurezza telemedicina di '%s' prima dell'OCR: %s [%s]",
+            subject, preliminary.summary(), _describe(preliminary),
+        )
+
+        discard_reason = self._reason_to_discard(screening, preliminary)
+        if discard_reason:
+            logger.info("'%s' non passa alla lettura degli allegati: %s", subject, discard_reason)
             return self._result(
                 email, Esito.SCARTATA, screening,
                 self._sentiment(email, attachment_matched=False),
+                telemedicina=preliminary,
+                prenotazione=self._booking_confidence(email, preliminary),
                 started=started,
             )
 
         try:
-            analyses, match, matched_name = self._read_documents(email)
+            analyses, match, matched_name, text_read = self._read_documents(email)
         except Exception as exc:  # noqa: BLE001 - il servizio deve rispondere comunque
             logger.exception("Analisi non riuscita per '%s'", subject)
             return self._result(
                 email, Esito.ERRORE, screening,
                 self._sentiment(email, attachment_matched=False),
+                telemedicina=preliminary,
+                prenotazione=self._booking_confidence(email, preliminary),
                 started=started, error=str(exc),
             )
 
         esito = _decide(analyses, match)
-        sentiment = self._sentiment(email, attachment_matched=esito is Esito.CONFORME)
+        conforme = esito is Esito.CONFORME
+        sentiment = self._sentiment(email, attachment_matched=conforme)
+
+        # Punteggi definitivi: ora si sa anche cosa c'era negli allegati.
+        telemedicina = self._telemedicine_confidence(
+            email, document_text=text_read, document_matched=conforme
+        )
+        prenotazione = self._booking_confidence(
+            email, telemedicina, document_text=text_read, document_matched=conforme
+        )
+
         logger.info(
-            "Esito di '%s': %s (%s), sentiment %s, prenotazione %.2f",
+            "Esito di '%s': %s (%s), telemedicina %s, prenotazione %s, sentiment %s",
             subject, esito.value, match.summary() if match else "nessun documento letto",
-            sentiment.label, sentiment.booking.score,
+            telemedicina.summary(), prenotazione.summary(), sentiment.label,
+        )
+        logger.info(
+            "Indizi di prenotazione per '%s': %s", subject, _describe(prenotazione)
         )
         return self._result(
             email, esito, screening, sentiment,
+            telemedicina=telemedicina, prenotazione=prenotazione,
             started=started, attachments=analyses, match=match, matched_attachment=matched_name,
         )
+
+    def _reason_to_discard(
+        self, screening: ScreeningReport, preliminary: ConfidenceScore
+    ) -> Optional[str]:
+        """Motivo per non leggere gli allegati, oppure None per proseguire."""
+        if not self._settings.screening.stop_on_failure:
+            return None
+        if not screening.passed:
+            return "oggetto e corpo non parlano di telemedicina"
+        minimum = self._settings.confidence.min_percent_for_ocr
+        if preliminary.percent < minimum:
+            return (
+                f"sicurezza telemedicina {preliminary.percent:.1f}% sotto il minimo "
+                f"del {minimum:.0f}% richiesto per chiamare l'OCR"
+            )
+        return None
 
     def _log_inbound_email(self, email: InboundEmail) -> None:
         """Logga il contenuto in ingresso per facilitare il debug del flusso."""
@@ -134,28 +186,34 @@ class EmailAnalyzer:
         logger.info("Allegati ricevuti: %d", len(email.attachments))
         for index, item in enumerate(email.attachments, start=1):
             logger.info(
-                "Allegato %d: nome='%s' origine=%s tipo=%s dimensione=%d byte",
+                "Allegato %d: nome='%s' origine=%s tipo=%s dimensione=%d byte provenienza=%s",
                 index,
                 item.name,
                 item.origine.value,
                 item.content_type or "sconosciuto",
                 item.size_bytes,
+                item.source_path if item.source_path is not None else "payload (base64)",
             )
 
     # ------------------------------------------------------ allegati e foto
 
     def _read_documents(
         self, email: InboundEmail
-    ) -> Tuple[List[AttachmentAnalysis], Optional[MatchReport], Optional[str]]:
-        """Legge allegati e foto del corpo finche' non trova un documento conforme."""
+    ) -> Tuple[List[AttachmentAnalysis], Optional[MatchReport], Optional[str], str]:
+        """Legge allegati e foto del corpo finche' non trova un documento conforme.
+
+        Restituisce anche il testo complessivamente letto: entra nel calcolo
+        della sicurezza, non solo nella verifica dei criteri.
+        """
         candidates = self._select(email.attachments)
         if not candidates:
             logger.info("Nessun allegato o foto analizzabile in '%s'.", email.subject)
-            return [], None, None
+            return [], None, None, ""
 
         analyses: List[AttachmentAnalysis] = []
         best: Optional[MatchReport] = None
         matched_name: Optional[str] = None
+        texts: List[str] = []
 
         # La cartella temporanea (e i file scritti) sparisce all'uscita dal with.
         with tempfile.TemporaryDirectory(prefix="telemedicina-") as tmp_dir:
@@ -165,6 +223,7 @@ class EmailAnalyzer:
 
                 report: Optional[MatchReport] = None
                 if extracted.ok:
+                    texts.append(extracted.text)
                     report = evaluate(extracted.text, self._settings.rules)
                     logger.info(
                         "%s '%s' (%s): %s -> %s",
@@ -191,7 +250,7 @@ class EmailAnalyzer:
                         # Trovato: inutile spendere altre chiamate OCR.
                         break
 
-        return analyses, best, matched_name
+        return analyses, best, matched_name, "\n".join(texts)
 
     def _select(self, attachments: List[InboundAttachment]) -> List[InboundAttachment]:
         """Scarta cio' che non si sa leggere e limita il numero di chiamate OCR."""
@@ -207,7 +266,8 @@ class EmailAnalyzer:
             if item.size_bytes > limits.max_bytes:
                 logger.info("'%s' ignorato: %d byte oltre il limite.", item.name, item.size_bytes)
                 continue
-            if not item.content:
+            if not item.has_content:
+                logger.info("'%s' ignorato: nessun contenuto leggibile.", item.name)
                 continue
             selected.append(item)
 
@@ -227,6 +287,41 @@ class EmailAnalyzer:
             attachment_matched=attachment_matched,
         )
 
+    # ------------------------------------------------- percentuali di sicurezza
+
+    def _telemedicine_confidence(
+        self,
+        email: InboundEmail,
+        *,
+        document_text: str = "",
+        document_matched: bool = False,
+    ) -> ConfidenceScore:
+        return score_telemedicine(
+            email.subject,
+            email.body_text,
+            self._settings.confidence,
+            attachment_names=[item.name for item in email.attachments],
+            document_text=document_text,
+            document_matched=document_matched,
+        )
+
+    def _booking_confidence(
+        self,
+        email: InboundEmail,
+        telemedicina: ConfidenceScore,
+        *,
+        document_text: str = "",
+        document_matched: bool = False,
+    ) -> ConfidenceScore:
+        return score_booking(
+            email.subject,
+            email.body_text,
+            self._settings.confidence,
+            telemedicine=telemedicina,
+            document_text=document_text,
+            document_matched=document_matched,
+        )
+
     # ----------------------------------------------------------------- utili
 
     @staticmethod
@@ -236,6 +331,8 @@ class EmailAnalyzer:
         screening: ScreeningReport,
         sentiment: SentimentScore,
         *,
+        telemedicina: ConfidenceScore,
+        prenotazione: ConfidenceScore,
         started: float,
         attachments: Optional[List[AttachmentAnalysis]] = None,
         match: Optional[MatchReport] = None,
@@ -248,10 +345,13 @@ class EmailAnalyzer:
             esito=esito,
             screening=screening,
             sentiment=sentiment,
+            telemedicina=telemedicina,
+            prenotazione=prenotazione,
             attachments=attachments or [],
             matched_attachment=matched_attachment,
             match=match,
             error=error,
+            warnings=list(email.warnings),
             duration_ms=int((time.monotonic() - started) * 1000),
         )
 
@@ -268,8 +368,26 @@ def _decide(analyses: List[AttachmentAnalysis], match: Optional[MatchReport]) ->
     return Esito.NON_CONFORME
 
 
+def _describe(score: ConfidenceScore) -> str:
+    """Indizi del punteggio in una riga, per il log."""
+    parts = [f"{item.label} ({item.where}) {item.weight:+.2f}" for item in score.evidence]
+    return "; ".join(parts) or "nessun indizio"
+
+
 def _write_to_disk(item: InboundAttachment, directory: Path, index: int) -> AttachmentFile:
-    """Scrive l'allegato in una cartella temporanea, con un nome sicuro."""
+    """Rende l'allegato un file su disco, pronto per l'OCR.
+
+    Se il payload ne ha indicato il percorso il file c'e' gia': si usa dov'e'
+    (e non lo si tocca), invece di ricopiarlo nella cartella temporanea.
+    """
+    if item.source_path is not None and item.source_path.is_file():
+        return AttachmentFile(
+            path=item.source_path,
+            original_name=item.name,
+            size_bytes=item.size_bytes,
+            origine=item.origine,
+        )
+
     target = _unique_path(directory, _sanitize_filename(item.name, index))
     target.write_bytes(item.content)
     return AttachmentFile(

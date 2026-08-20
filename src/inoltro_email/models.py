@@ -45,12 +45,21 @@ class Origine(str, Enum):
 
 @dataclass
 class InboundAttachment:
-    """Allegato ricevuto da Power Automate, ancora in memoria."""
+    """Allegato ricevuto da Power Automate.
+
+    Arriva in due forme, entrambe supportate:
+
+    * ``content`` valorizzato -> il file viaggia in base64 dentro il payload;
+    * ``source_path`` valorizzato -> il payload porta solo il percorso del file
+      (campo ``attchment`` del flusso Power Automate) e il file sta gia' su
+      disco: non lo si ricopia, lo si manda all'OCR da dove si trova.
+    """
 
     name: str
-    content: bytes
+    content: bytes = b""
     content_type: str = ""
     origine: Origine = Origine.ALLEGATO
+    source_path: Optional[Path] = None
 
     @property
     def extension(self) -> str:
@@ -58,7 +67,21 @@ class InboundAttachment:
 
     @property
     def size_bytes(self) -> int:
-        return len(self.content)
+        if self.content:
+            return len(self.content)
+        if self.source_path is not None:
+            try:
+                return self.source_path.stat().st_size
+            except OSError:
+                return 0
+        return 0
+
+    @property
+    def has_content(self) -> bool:
+        """C'e' qualcosa da leggere: byte in memoria o un file raggiungibile."""
+        if self.content:
+            return True
+        return self.source_path is not None and self.source_path.is_file()
 
 
 @dataclass
@@ -77,6 +100,9 @@ class InboundEmail:
     sender: str = ""
     received_at: str = ""
     attachments: List[InboundAttachment] = field(default_factory=list)
+    # Problemi non bloccanti trovati nel payload: percorsi di allegati non
+    # raggiungibili, corpo non risolto dal flusso, riparazioni al JSON.
+    warnings: List[str] = field(default_factory=list)
 
     @property
     def key(self) -> str:
@@ -203,6 +229,40 @@ class BookingScore:
 
 
 @dataclass
+class Evidence:
+    """Un singolo indizio che sposta la percentuale di sicurezza.
+
+    ``weight`` e' espresso in log-odds: positivo se l'indizio depone a favore,
+    negativo se depone contro. La somma dei pesi diventa una percentuale.
+    """
+
+    label: str
+    where: str  # oggetto | corpo | citato | allegati | documento | indirizzi
+    weight: float
+
+
+@dataclass
+class ConfidenceScore:
+    """Quanto il servizio e' sicuro di un'affermazione, in percentuale."""
+
+    percent: float  # da 0 a 100
+    level: str  # "molto alta" | "alta" | "media" | "bassa" | "molto bassa"
+    holds: bool  # la percentuale supera la soglia configurata
+    evidence: List[Evidence] = field(default_factory=list)
+
+    @property
+    def positives(self) -> List[Evidence]:
+        return [item for item in self.evidence if item.weight > 0]
+
+    @property
+    def negatives(self) -> List[Evidence]:
+        return [item for item in self.evidence if item.weight < 0]
+
+    def summary(self) -> str:
+        return f"{self.percent:.1f}% ({self.level})"
+
+
+@dataclass
 class SentimentScore:
     """Polarita' del testo piu' l'intento di prenotazione."""
 
@@ -224,12 +284,20 @@ class EmailAnalysis:
     esito: Esito
     screening: ScreeningReport
     sentiment: SentimentScore
+    telemedicina: ConfidenceScore
+    prenotazione: ConfidenceScore
     attachments: List[AttachmentAnalysis] = field(default_factory=list)
     matched_attachment: Optional[str] = None
     match: Optional[MatchReport] = None
     error: Optional[str] = None
+    warnings: List[str] = field(default_factory=list)
     duration_ms: int = 0
 
     @property
     def conforme(self) -> bool:
         return self.esito is Esito.CONFORME
+
+    @property
+    def e_prenotazione_telemedicina(self) -> bool:
+        """Verdetto richiesto dal flusso: e' una prenotazione di telemedicina?"""
+        return self.telemedicina.holds and self.prenotazione.holds

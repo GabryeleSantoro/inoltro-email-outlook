@@ -4,12 +4,16 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
 **Power Automate**. Per ogni messaggio ricevuto il servizio:
 
 1. verifica che **oggetto o corpo** parlino di **telemedicina** o **televisita**;
-2. legge **allegati e foto incorporate nel corpo** con l'OCR di
-   [ocr.space](https://ocr.space/ocrapi) e controlla che il testo contenga
-   **sia "telemedicina" sia il codice "1501A"**;
-3. calcola un **punteggio di sentiment** del messaggio e un punteggio di
-   **intento di prenotazione** (quanto somiglia alla richiesta di prenotare una
-   telemedicina).
+2. legge **allegati e foto** con l'OCR di [ocr.space](https://ocr.space/ocrapi)
+   e controlla che il testo contenga **sia "telemedicina" sia il codice
+   "1501A"**. Gli allegati possono arrivare in base64 dentro il payload oppure
+   **come percorso su disco**: in quel caso il file viene letto da dove si trova
+   e mandato all'OCR senza ricopiarlo;
+3. restituisce due **percentuali di sicurezza**: quanto e' sicuro che il
+   messaggio riguardi la **telemedicina** e quanto e' sicuro che sia una
+   **prenotazione** di telemedicina, con l'elenco degli indizi che le hanno
+   determinate;
+4. calcola un **punteggio di sentiment** del messaggio.
 
 La risposta e' un JSON che il flusso Power Automate puo' usare per decidere cosa
 fare: inoltrare, aprire una pratica, rispondere al paziente o ignorare. Il
@@ -43,8 +47,20 @@ Power Automate (nuova email)  --POST /analizza-email-->  servizio
 
 Alcune scelte di funzionamento:
 
+- **Parlare di telemedicina non e' prenotarla.** Nella casella arrivano fogli
+  di accessi mensili, variazioni economiche, preventivi di fornitori, aperture
+  di agenda e segnalazioni di guasto: contengono tutti la parola
+  "telemedicina", nessuno e' una prenotazione. Per questo le due percentuali
+  sono separate e i contesti amministrativi, commerciali e di assistenza
+  abbassano quella di prenotazione.
+- **JSON riparato in lettura.** Power Automate costruisce il corpo della
+  richiesta concatenando stringhe: arrivano a capo veri dentro il corpo HTML,
+  virgolette non protette (`style="..."`) e percorsi Windows (`C:\Users\...`),
+  tutte cose che rendono il JSON non valido. Il servizio lo legge lo stesso e
+  segnala nella risposta (`avvisi`) che cosa ha dovuto aggiustare.
 - **Screening prima dell'OCR**: se oggetto e corpo non parlano di telemedicina
-  non si spende nemmeno una chiamata all'API (`screening.stop_on_failure`).
+  non si spende nemmeno una chiamata all'API (`screening.stop_on_failure`), e
+  nemmeno se la sicurezza resta sotto `confidence.min_percent_for_ocr`.
 - **Risparmio di quota OCR**: se un PDF ha gia' il livello di testo lo si legge
   con `pypdf`, senza uscire dalla macchina; e non appena un documento soddisfa i
   criteri gli altri non vengono piu' analizzati.
@@ -110,7 +126,13 @@ Le voci da rivedere subito:
 | `rules.keywords` / `rules.codes` | criteri sul testo dei documenti; con `mode: all` servono tutti |
 | `attachments.include_inline_images` | analizza anche le foto incorporate nel corpo |
 | `attachments.max_files` | quanti file al massimo passare all'OCR per email |
-| `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" |
+| `local_files.enabled` | leggi gli allegati indicati per percorso (campo `attchment`) |
+| `local_files.allowed_directories` | cartelle da cui e' lecito leggere: da riempire se il servizio e' raggiungibile in rete |
+| `local_files.search_directories` | dove cercare il file per nome se il percorso non esiste |
+| `confidence.telemedicine_threshold` | sopra questa percentuale il messaggio "e' telemedicina" |
+| `confidence.booking_threshold` | sopra questa percentuale "e' una prenotazione" |
+| `confidence.min_percent_for_ocr` | sotto questa percentuale non si chiama l'OCR |
+| `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" (punteggio storico, da `0` a `1`) |
 | `api.host` / `api.port` | dove ascolta il servizio (le variabili `API_HOST` e `PORT` hanno la precedenza) |
 | `ocr.max_file_bytes` / `ocr.max_pdf_pages_per_request` | limiti del piano ocr.space |
 
@@ -164,6 +186,24 @@ Graph*, e le chiavi possono avere maiuscole o minuscole:
 }
 ```
 
+E' accettata anche la forma del flusso che salva gli allegati su disco e ne
+manda solo il percorso. La chiave `attchment` e' scritta cosi', senza la "a", ed
+e' presa com'e'; `date` vale come data di ricezione:
+
+```json
+{
+  "subject": "Richiesta prenotazione televisita",
+  "body": "<html>...</html>",
+  "date": "08/20/2026 10:26",
+  "attchment": "C:\\Users\\user\\Documents\\Power Automate\\Allegati\\impegnativa.png"
+}
+```
+
+Piu' allegati si indicano con un elenco. Se il flusso li scrive in fila senza
+ripetere la chiave (`"attchment":"uno.png","due.pdf"`) vengono raccolti lo
+stesso. I file vengono cercati al percorso indicato e, se non c'e', per nome
+nelle cartelle di `local_files.search_directories`.
+
 ### Risposta
 
 ```json
@@ -172,6 +212,32 @@ Graph*, e le chiavi possono avere maiuscole o minuscole:
   "oggetto": "Richiesta prenotazione televisita",
   "esito": "conforme",
   "conforme": true,
+  "prenotazione_telemedicina": true,
+  "telemedicina": {
+    "percentuale": 99.9,
+    "livello": "molto alta",
+    "confermato": true,
+    "indizi_a_favore": [
+      { "indizio": "televisita", "dove": "oggetto", "peso": 3.2 },
+      { "indizio": "televisita ripreso nel corpo", "dove": "corpo", "peso": 0.8 },
+      { "indizio": "telemedicina nel documento letto", "dove": "documento", "peso": 2.4 },
+      { "indizio": "documento con tutti i criteri", "dove": "documento", "peso": 2.5 }
+    ],
+    "indizi_contrari": []
+  },
+  "prenotazione": {
+    "percentuale": 99.6,
+    "livello": "molto alta",
+    "confermato": true,
+    "indizi_a_favore": [
+      { "indizio": "tema telemedicina al 100%", "dove": "telemedicina", "peso": 2.0 },
+      { "indizio": "prenotazione", "dove": "oggetto", "peso": 2.4 },
+      { "indizio": "impegnativa", "dove": "corpo", "peso": 1.2 },
+      { "indizio": "richiesta esplicita", "dove": "corpo", "peso": 0.4 },
+      { "indizio": "documento con tutti i criteri", "dove": "documento", "peso": 2.8 }
+    ],
+    "indizi_contrari": []
+  },
   "screening": { "superato": true, "termini": ["televisita"], "dove": ["oggetto", "corpo"] },
   "criteri": {
     "soddisfatti": true,
@@ -202,6 +268,7 @@ Graph*, e le chiavi possono avere maiuscole o minuscole:
       "indizi": ["prenotazione", "telemedicina", "impegnativa", "allegato conforme"]
     }
   },
+  "avvisi": [],
   "errore": null,
   "durata_ms": 63,
   "analizzato_il": "2026-08-19T08:00:01+00:00"
@@ -218,9 +285,47 @@ Valori possibili di `esito`:
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
 
+### Le percentuali di sicurezza
+
+`telemedicina.percentuale` e `prenotazione.percentuale` vanno da `0` a `100` e
+rispondono a due domande diverse:
+
+| Campo | Domanda | Soglia |
+|---|---|---|
+| `telemedicina` | il messaggio riguarda la telemedicina? | `confidence.telemedicine_threshold` |
+| `prenotazione` | e' la prenotazione di una prestazione di telemedicina? | `confidence.booking_threshold` |
+| `prenotazione_telemedicina` | verdetto unico: entrambe sopra soglia | - |
+
+Ogni indizio vale un peso: si sommano e la somma diventa una percentuale. Sono
+tutti riportati in `indizi_a_favore` e `indizi_contrari`, con il punto del
+messaggio da cui arrivano (`oggetto`, `corpo`, `citato`, `allegati`,
+`documento`, `indirizzi`), quindi la percentuale e' sempre giustificabile.
+
+Cosa alza la percentuale di **telemedicina**: i termini `telemedicina`,
+`televisita`, `teleconsulto`, `telemonitoraggio`, `teleassistenza` nell'oggetto
+(molto), nel corpo (parecchio), nel nome di un allegato o nel testo letto
+dall'OCR. Pesano meno se compaiono solo nella parte citata di una risposta, e
+quasi nulla se compaiono solo dentro un indirizzo di posta
+(`telemedicina@aslsalerno.it` in copia non rende il messaggio una questione di
+telemedicina).
+
+Cosa alza quella di **prenotazione**: `prenotare`, `appuntamento`,
+`impegnativa`, `ricetta`, il codice `1501A`, i riferimenti di una prenotazione,
+la richiesta di disponibilita' e - soprattutto - un allegato che soddisfa tutti
+i criteri. Cosa la abbassa: rendiconti di accessi e presenze, pratiche
+economiche, documenti commerciali, newsletter, segnalazioni di guasto, richieste
+di apertura agenda o di abilitazione a una piattaforma, disdette e risposte
+automatiche.
+
 `sentiment.punteggio` va da `-1` (negativo) a `+1` (positivo);
 `sentiment.prenotazione.punteggio` va da `0` a `1` ed e' confrontato con
-`sentiment.booking_threshold` per ottenere `e_prenotazione`.
+`sentiment.booking_threshold` per ottenere `e_prenotazione`. Resta per
+compatibilita': per decidere conviene usare `prenotazione_telemedicina`.
+
+`avvisi` elenca i problemi non bloccanti trovati nel payload: JSON riparato in
+lettura, allegati indicati per percorso ma non trovati, corpo non risolto dal
+flusso (`Unknown Property 'HtmlBody'`). L'analisi va avanti lo stesso, ma sono
+il segnale che il flusso Power Automate va corretto a monte.
 
 Codici di stato: `200` analisi eseguita (anche quando l'email non e' conforme),
 `400` payload non interpretabile, `401` chiave assente o errata, `413` richiesta
@@ -253,10 +358,43 @@ oltre `api.max_request_bytes`. Gli errori hanno la forma
 
      Gli allegati del connettore contengono gia' `name`, `contentType` e
      `contentBytes` in base64: vanno passati cosi' come sono.
-3. **Condizione** sul risultato, per esempio
-   `body('HTTP')?['conforme']` uguale a `true`, oppure
-   `body('HTTP')?['sentiment']?['prenotazione']?['e_prenotazione']` uguale a
-   `true`.
+
+     **Racchiudere ogni campo dinamico fra virgolette e passarlo da
+     `json()`/`string()`**: senza, il corpo HTML finisce nel JSON con gli a capo
+     veri e le virgolette dei suoi attributi, e il payload non e' JSON valido.
+     Il servizio lo ripara e lo analizza lo stesso, ma lo segnala in `avvisi`.
+
+     Se il flusso salva gli allegati in una cartella invece di passarli in
+     base64, basta mandarne il percorso:
+
+     ```
+     {
+       "subject": "@{triggerOutputs()?['body/subject']}",
+       "body": @{json(triggerOutputs()?['body/body'])},
+       "date": "@{triggerOutputs()?['body/receivedDateTime']}",
+       "attchment": "@{items('Applica_a_ogni')?['FullPath']}"
+     }
+     ```
+
+     Il servizio legge i file da quei percorsi e li manda all'OCR: devono quindi
+     essere raggiungibili dalla macchina su cui gira il servizio (stessa
+     macchina, o una cartella condivisa indicata in
+     `local_files.search_directories`).
+
+     > **Attenzione**: i file indicati nel payload vengono caricati su
+     > ocr.space. Se il servizio e' raggiungibile da altre macchine, riempire
+     > `local_files.allowed_directories` con la sola cartella degli allegati:
+     > senza, chiunque possa chiamare l'endpoint sceglie quali file del disco
+     > (fra quelli con estensione ammessa) finiscono all'OCR. All'avvio il
+     > servizio lo segnala nei log.
+3. **Condizione** sul risultato. Il campo da guardare dipende dalla domanda:
+   - `body('HTTP')?['prenotazione_telemedicina']` uguale a `true` -> e' una
+     richiesta di prenotazione di telemedicina (le due percentuali sono
+     entrambe sopra soglia);
+   - `body('HTTP')?['telemedicina']?['percentuale']` maggiore di `70` -> riguarda
+     la telemedicina, a qualunque titolo;
+   - `body('HTTP')?['conforme']` uguale a `true` -> un allegato contiene tutti i
+     criteri (`telemedicina` + `1501A`).
 4. **Azione conclusiva** a scelta: *Inoltra messaggio*, creazione di un
    elemento in un elenco, notifica in Teams, risposta automatica al paziente.
 
@@ -300,9 +438,11 @@ configurazione o file non leggibile, `130` interruzione da tastiera.
 src/inoltro_email/
 ├── __main__.py        riga di comando (serve | analizza | check-file)
 ├── config.py          lettura e validazione di config.yaml + .env
-├── inbound.py         lettura del payload di Power Automate (HTML, base64, foto del corpo)
+├── rawjson.py         lettura tollerante del JSON non valido prodotto dal flusso
+├── inbound.py         lettura del payload di Power Automate (HTML, base64, foto del corpo, percorsi su disco)
+├── confidence.py      percentuali di sicurezza: telemedicina e prenotazione
 ├── matching.py        normalizzazione del testo, screening e criteri telemedicina/1501A
-├── analysis.py        orchestrazione: screening -> OCR -> criteri -> sentiment
+├── analysis.py        orchestrazione: screening -> sicurezza -> OCR -> criteri -> percentuali
 ├── sentiment.py       punteggio di polarita' e di intento di prenotazione
 ├── models.py          strutture dati condivise
 ├── logging_setup.py   log su console e su file rotante

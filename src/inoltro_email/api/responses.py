@@ -10,7 +10,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from ..models import AttachmentAnalysis, EmailAnalysis, MatchReport, SentimentScore
+from ..models import (
+    AttachmentAnalysis, ConfidenceScore, EmailAnalysis, MatchReport, SentimentScore,
+)
 
 
 def analysis_to_dict(analysis: EmailAnalysis) -> Dict[str, Any]:
@@ -20,6 +22,11 @@ def analysis_to_dict(analysis: EmailAnalysis) -> Dict[str, Any]:
         "oggetto": analysis.subject,
         "esito": analysis.esito.value,
         "conforme": analysis.conforme,
+        # Verdetto sintetico: e' una prenotazione di telemedicina? Vale solo se
+        # entrambe le percentuali superano la rispettiva soglia.
+        "prenotazione_telemedicina": analysis.e_prenotazione_telemedicina,
+        "telemedicina": confidence_to_dict(analysis.telemedicina),
+        "prenotazione": confidence_to_dict(analysis.prenotazione),
         "screening": {
             "superato": analysis.screening.passed,
             "termini": analysis.screening.terms,
@@ -28,10 +35,30 @@ def analysis_to_dict(analysis: EmailAnalysis) -> Dict[str, Any]:
         "criteri": _criteria_to_dict(analysis.match, analysis.matched_attachment),
         "documenti": [_document_to_dict(item) for item in analysis.attachments],
         "sentiment": sentiment_to_dict(analysis.sentiment),
+        "avvisi": analysis.warnings,
         "errore": analysis.error,
         "durata_ms": analysis.duration_ms,
         "analizzato_il": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+
+
+def confidence_to_dict(score: ConfidenceScore) -> Dict[str, Any]:
+    """Percentuale di sicurezza con gli indizi che l'hanno determinata.
+
+    ``indizi_a_favore`` e ``indizi_contrari`` sono in ordine di applicazione e
+    riportano il peso di ciascuno: la percentuale resta verificabile a mano.
+    """
+    return {
+        "percentuale": score.percent,
+        "livello": score.level,
+        "confermato": score.holds,
+        "indizi_a_favore": [_evidence_to_dict(item) for item in score.positives],
+        "indizi_contrari": [_evidence_to_dict(item) for item in score.negatives],
+    }
+
+
+def _evidence_to_dict(item: Any) -> Dict[str, Any]:
+    return {"indizio": item.label, "dove": item.where, "peso": item.weight}
 
 
 def sentiment_to_dict(sentiment: SentimentScore) -> Dict[str, Any]:
