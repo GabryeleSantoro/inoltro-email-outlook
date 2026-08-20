@@ -160,3 +160,125 @@ def test_salute_resta_pubblica(client_protetto: TestClient) -> None:
 def test_documentazione_openapi_disponibile(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     assert "/analizza-email" in schema["paths"]
+
+
+# ----------------------------------------- payload reali del flusso in uso
+
+
+def _payload_del_flusso(oggetto: str, corpo_html: str, percorso: str = "") -> bytes:
+    """Ricostruisce il JSON come lo scrive davvero Power Automate.
+
+    A capo veri nel corpo, virgolette degli attributi HTML non protette e
+    percorso Windows con barre rovesciate: e' il payload che nei log finiva
+    sistematicamente in 400.
+    """
+    allegato = f',"attchment":"{percorso}"' if percorso else ',"attchment":""'
+    return (
+        f'{{"subject":"{oggetto}","body":"{corpo_html}",'
+        f'"date":"08/20/2026 10:26"{allegato}}}'
+    ).encode("utf-8")
+
+
+CORPO_DEL_LOG = (
+    "<html>\n<head>\n"
+    '<style type="text/css" style="display:none;"> P {margin-top:0;} </style>\n'
+    "</head>\n"
+    '<body dir="ltr">\n'
+    '<div class="elementToProof" style="font-size: 12pt;">\n'
+    "Buongiorno, vorrei prenotare una televisita. In allegato l'impegnativa.</div>\n"
+    "</body>\n</html>\n"
+)
+
+
+def test_payload_non_valido_del_flusso_viene_riparato(client: TestClient) -> None:
+    risposta = client.post(
+        "/analizza-email",
+        content=_payload_del_flusso("Richiesta prenotazione televisita", CORPO_DEL_LOG),
+        headers={"content-type": "application/json"},
+    )
+
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert corpo["oggetto"] == "Richiesta prenotazione televisita"
+    assert corpo["screening"]["superato"] is True
+    assert any("riparato" in avviso for avviso in corpo["avvisi"])
+
+
+def test_allegato_indicato_per_percorso_arriva_all_ocr(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    """Il percorso del payload e' la base per l'invio a ocr.space."""
+    impegnativa = tmp_path / "image (2).png"
+    impegnativa.write_bytes(b"finta immagine")
+    settings.local_files.search_directories = [tmp_path]
+
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        risposta = instance.post(
+            "/analizza-email",
+            content=_payload_del_flusso(
+                "Richiesta prenotazione televisita",
+                CORPO_DEL_LOG,
+                r"C:\\Users\\user\\Documents\\Power Automate\\Allegati\\image (2).png",
+            ),
+            headers={"content-type": "application/json"},
+        )
+
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert ocr.calls == ["image (2).png"]
+    assert corpo["esito"] == "conforme"
+    assert corpo["documenti"][0]["nome"] == "image (2).png"
+
+
+def test_percentuali_nella_risposta(client: TestClient) -> None:
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+
+    corpo = client.post("/analizza-email", json=payload).json()
+
+    assert corpo["telemedicina"]["percentuale"] > 90
+    assert corpo["telemedicina"]["livello"] == "molto alta"
+    assert corpo["telemedicina"]["confermato"] is True
+    assert corpo["prenotazione"]["percentuale"] > 90
+    assert corpo["prenotazione_telemedicina"] is True
+    assert corpo["telemedicina"]["indizi_a_favore"], "gli indizi spiegano la percentuale"
+
+
+def test_email_di_telemedicina_che_non_e_prenotazione(
+    settings: Settings, ocr: FakeOcrClient
+) -> None:
+    """Foglio degli accessi mensili: telemedicina si', prenotazione no."""
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        corpo = instance.post(
+            "/analizza-email",
+            json=email_payload(
+                subject="Accessi Telemedicina Luglio 2026 Dott.ssa Caccavo",
+                body="In allegato gli accessi in Telemedicina del mese di Luglio 2026.",
+            ),
+        ).json()
+
+    assert corpo["telemedicina"]["confermato"] is True
+    assert corpo["prenotazione"]["confermato"] is False
+    assert corpo["prenotazione_telemedicina"] is False
+
+
+def test_sotto_la_soglia_minima_non_si_chiama_l_ocr(
+    settings: Settings, ocr: FakeOcrClient
+) -> None:
+    """Il termine solo nell'indirizzo non giustifica una chiamata all'OCR."""
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    with TestClient(create_app(settings, analyzer=analyzer)) as instance:
+        corpo = instance.post(
+            "/analizza-email",
+            json=email_payload(
+                subject="Richiesta accesso piattaforma COT",
+                body="Si richiede l'accesso alla piattaforma COT.\n"
+                     "Da: Telemedicina <telemedicina@aslsalerno.it>",
+                attachments=[attachment_payload("modulo.pdf", make_blank_pdf())],
+            ),
+        ).json()
+
+    assert corpo["esito"] == "scartata"
+    assert corpo["telemedicina"]["percentuale"] < 25
+    assert ocr.calls == []

@@ -26,6 +26,7 @@ from .analysis import EmailAnalyzer
 from .api.responses import analysis_to_dict
 from .config import ConfigError, Settings
 from .inbound import InboundError, parse_email
+from .rawjson import RawJsonError, loads_tolerant
 from .logging_setup import setup_logging
 from .matching import evaluate
 from .models import AttachmentFile, Esito
@@ -114,20 +115,27 @@ def _cmd_analizza(settings: Settings, path: Optional[Path]) -> int:
         return 2
 
     try:
-        payload = json.loads(raw)
-    except ValueError as exc:
+        payload, repairs = loads_tolerant(raw)
+    except RawJsonError as exc:
         print(f"JSON non valido: {exc}", file=sys.stderr)
         return 2
+
+    if repairs:
+        print(f"JSON riparato in lettura: {'; '.join(repairs)}", file=sys.stderr)
 
     try:
         email = parse_email(
             payload,
             include_inline_images=settings.attachments.include_inline_images,
             max_attachment_bytes=settings.attachments.max_bytes,
+            local_files=settings.local_files,
         )
     except InboundError as exc:
         print(f"Payload non interpretabile: {exc}", file=sys.stderr)
         return 2
+
+    if repairs:
+        email.warnings.append("JSON non valido riparato in lettura: " + "; ".join(repairs))
 
     with OcrSpaceClient(settings.ocr) as ocr_client:
         analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr_client))
