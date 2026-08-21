@@ -180,8 +180,18 @@ class SentimentSettings:
 
 @dataclass
 class LoggingSettings:
+    """``file`` e' il modello del nome: ogni sessione ne ricava il proprio.
+
+    Con ``per_session`` attivo (predefinito) da ``logs/inoltro.log`` nasce un
+    file per ogni avvio, con data e ora di inizio nel nome
+    (``logs/inoltro-20250521-091500.log``); ``keep_sessions`` dice quanti
+    conservarne (0 = nessuna cancellazione automatica).
+    """
+
     level: str = "INFO"
-    file: Optional[Path] = Path("logs/servizio.log")
+    file: Optional[Path] = Path("logs/inoltro.log")
+    per_session: bool = True
+    keep_sessions: int = 30
 
 
 @dataclass
@@ -354,6 +364,8 @@ class Settings:
         logging_settings = LoggingSettings(
             level=str(log_raw.get("level", "INFO")).upper(),
             file=Path(str(log_file)) if log_file else None,
+            per_session=bool(log_raw.get("per_session", LoggingSettings.per_session)),
+            keep_sessions=int(log_raw.get("keep_sessions", LoggingSettings.keep_sessions)),
         )
         return cls(
             api=api,
@@ -419,6 +431,14 @@ class Settings:
             raise ConfigError(
                 "sentiment.negative_threshold deve essere <= sentiment.positive_threshold."
             )
+        if self.outlook.poll_interval_minutes < 1:
+            raise ConfigError("outlook.poll_interval_minutes deve essere >= 1.")
+        if self.outlook.lookback_minutes < 1:
+            raise ConfigError("outlook.lookback_minutes deve essere >= 1.")
+        if self.outlook.max_messages_per_poll < 1:
+            raise ConfigError("outlook.max_messages_per_poll deve essere >= 1.")
+        if self.logging.keep_sessions < 0:
+            raise ConfigError("logging.keep_sessions deve essere >= 0 (0 = conservali tutti).")
 
     def ensure_directories(self) -> None:
         """Crea la cartella dei log: il primo avvio non fallisce."""

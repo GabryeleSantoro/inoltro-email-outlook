@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -83,7 +84,19 @@ def main(argv: Optional[List[str]] = None) -> int:
             settings.api.port = args.port
 
     settings.ensure_directories()
-    setup_logging(args.log_level or settings.logging.level, settings.logging.file)
+    started_at = datetime.now()
+    log_file = setup_logging(
+        args.log_level or settings.logging.level,
+        settings.logging.file,
+        per_session=settings.logging.per_session,
+        keep_sessions=settings.logging.keep_sessions,
+        started_at=started_at,
+    )
+    logger.info(
+        "Sessione '%s' avviata il %s.", args.command, started_at.strftime("%d/%m/%Y alle %H:%M:%S")
+    )
+    if log_file:
+        logger.info("Log di questa sessione: %s", log_file)
 
     try:
         if args.command == "serve":

@@ -195,5 +195,37 @@ def test_serve_senza_argomenti_usa_la_configurazione(config_file: Path,
 def test_configurazione_mancante(tmp_path: Path, capsys) -> None:
     code = main(["--config", str(tmp_path / "assente.yaml"), "check-file", "x.pdf"])
 
-    assert code == 2
-    assert "Errore di configurazione" in capsys.readouterr().err
+    assert code == 3
+    assert "non riuscita" in capsys.readouterr().err
+
+
+def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ogni avvio crea il proprio file di log, con data e ora nel nome."""
+    import logging
+
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave-di-prova")
+    logs = tmp_path / "logs"
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        CONFIG.format(
+            db=(tmp_path / "state.sqlite3").as_posix(),
+            token=(tmp_path / "o365_token.txt").as_posix(),
+        ).replace('level: "WARNING"', 'level: "INFO"').replace(
+            "file: null", f'file: "{(logs / "inoltro.log").as_posix()}"'
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        # File inesistente: basta ad arrivare oltre l'impostazione del logging.
+        assert main(["--config", str(config), "check-file", str(tmp_path / "manca.pdf")]) == 2
+        assert main(["--config", str(config), "check-file", str(tmp_path / "manca.pdf")]) == 2
+    finally:
+        for handler in list(logging.getLogger().handlers):
+            logging.getLogger().removeHandler(handler)
+            handler.close()
+
+    prodotti = sorted(logs.glob("inoltro-*.log"))
+    assert len(prodotti) == 2, prodotti
+    assert not (logs / "inoltro.log").exists()
+    assert "Sessione 'check-file' avviata il" in prodotti[0].read_text(encoding="utf-8")

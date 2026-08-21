@@ -579,15 +579,14 @@ src/inoltro_email/
 ├── analysis.py        orchestrazione: screening -> sicurezza -> OCR -> criteri -> percentuali
 ├── sentiment.py       punteggio di polarita' e di intento di prenotazione
 ├── models.py          strutture dati condivise
-├── logging_setup.py   log su console e su file rotante
-├── api/
-│   ├── app.py         applicazione FastAPI e endpoint
-│   ├── responses.py   traduzione del risultato nel JSON di risposta
-│   └── server.py      avvio con uvicorn
-└── ocr/
-    ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
-    ├── images.py      riduzione delle immagini troppo grandi per l'API
-    └── extractor.py   lettura di un documento: livello di testo del PDF + OCR
+├── logging_setup.py   log su console e su un file per ogni sessione
+├── ocr/
+│   ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
+│   └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
+└── outlook/
+    ├── protocol.py    interfacce usate dalla pipeline (niente Graph)
+    ├── client.py      implementazione su Microsoft Graph (libreria O365)
+    └── poller.py      controllo periodico della casella
 ```
 
 `analysis.py` non conosce HTTP e `api/app.py` non conosce l'OCR: la logica e'
@@ -640,11 +639,18 @@ sanitari occorre verificarne l'ammissibilita' prima di attivare il flusso in
 produzione. I PDF gia' provvisti di testo non escono mai dalla macchina, perche'
 vengono letti in locale.
 
-**Dove finiscono i dati.** Allegati e foto vengono scritti in una cartella
-temporanea di sistema, rimossa al termine di ogni richiesta. Restano su disco
-soltanto i log in `logs/`.
+**Dove finiscono i dati.** Gli allegati sono salvati in una cartella temporanea
+di sistema, rimossa al termine dell'elaborazione di ogni messaggio. Restano su
+disco soltanto il registro `state/processed.sqlite3` e i log in `logs/`.
 
-**Il sentiment e' un'indicazione.** Il punteggio nasce da un lessico e da regole
-esplicite: e' utile per dare priorita' o per intercettare un reclamo, non per
-decidere da solo. La decisione clinica o amministrativa resta al flusso e alle
-persone.
+**I log.** Ogni avvio del programma scrive il proprio file, con data e ora di
+inizio nel nome: `logs/inoltro-20250521-091500.log` per una sessione partita il
+21 maggio 2025 alle 9:15. Le esecuzioni non si mescolano piu' e la prima riga di
+ogni file dice quale comando e' stato lanciato e quando. Si regola dalla sezione
+`logging` di `config.yaml`:
+
+| Chiave | Effetto |
+| --- | --- |
+| `file` | modello del nome (`logs/inoltro.log`), da cui si ricava quello di sessione |
+| `per_session` | `false` per tornare a un unico file cumulativo |
+| `keep_sessions` | quanti file conservare; i piu' vecchi vengono cancellati all'avvio (`0` = tutti) |
