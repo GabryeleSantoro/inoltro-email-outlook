@@ -10,6 +10,7 @@ direttamente::
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 from ..config import Settings
@@ -23,7 +24,13 @@ def build() -> "object":
     return create_app()
 
 
-def run(settings: Optional[Settings] = None, *, reload: bool = False) -> None:
+def run(
+    settings: Optional[Settings] = None,
+    *,
+    reload: bool = False,
+    flow_path: Optional[Path] = None,
+    flow_timer: int = 60,
+) -> None:
     """Avvia il server HTTP (bloccante) fino a Ctrl+C."""
     try:
         import uvicorn
@@ -37,9 +44,15 @@ def run(settings: Optional[Settings] = None, *, reload: bool = False) -> None:
         "Servizio in ascolto su http://%s:%d (documentazione su /docs).",
         settings.api.host, settings.api.port,
     )
+    if flow_path:
+        logger.info(
+            "Flusso Power Automate: '%s' ogni %d secondi.",
+            flow_path, flow_timer,
+        )
+
+    app = create_app(settings, flow_path=flow_path, flow_timer=flow_timer)
+
     if reload:
-        # Con il ricaricamento automatico uvicorn deve poter reimportare
-        # l'applicazione: si passa il percorso della fabbrica, non l'oggetto.
         uvicorn.run(
             "inoltro_email.api.server:build",
             factory=True,
@@ -50,8 +63,8 @@ def run(settings: Optional[Settings] = None, *, reload: bool = False) -> None:
         return
 
     uvicorn.run(
-        create_app(settings),
+        app,
         host=settings.api.host,
         port=settings.api.port,
-        log_config=None,  # il logging e' gia' configurato da logging_setup
+        log_config=None,
     )

@@ -121,9 +121,12 @@ Alcune scelte di funzionamento:
 git clone https://github.com/GabryeleSantoro/inoltro-email-outlook.git
 cd inoltro-email-outlook
 
+# Con uv (consigliato)
+uv sync
+
+# Oppure con venv + pip
 python -m venv .venv
 source .venv/bin/activate       # su Windows: .venv\Scripts\activate
-
 pip install -r requirements.txt
 ```
 
@@ -176,13 +179,26 @@ Le voci da rivedere subito:
 ## Avvio del servizio
 
 ```bash
-python -m inoltro_email serve                    # oppure: python main.py
+# Con uv (consigliato)
+uv run --isolated inoltro-email serve
+uv run --isolated inoltro-email serve --port 9000 --reload
+
+# Oppure con modulo
+uv run python -m inoltro_email serve
+uv run python -m inoltro_email serve --port 9000 --reload
+
+# Oppure direttamente (se il venv e' attivo)
+python -m inoltro_email serve
 python -m inoltro_email serve --port 9000 --reload
 ```
 
 In produzione si puo' usare direttamente uvicorn con piu' processi:
 
 ```bash
+# Con uv
+uv run uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 4
+
+# Oppure direttamente
 uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 4
 ```
 
@@ -542,6 +558,14 @@ consuma quota OCR.
 far partire il server):
 
 ```bash
+# Con uv (consigliato)
+uv run --isolated inoltro-email analizza email.json
+uv run --isolated inoltro-email analizza /path/to/email.json
+
+# Oppure con modulo
+uv run python -m inoltro_email analizza email.json
+
+# Oppure con python direttamente
 python -m inoltro_email analizza email.json
 cat email.json | python -m inoltro_email analizza
 ```
@@ -549,6 +573,10 @@ cat email.json | python -m inoltro_email analizza
 **Provare OCR e criteri su un singolo file**:
 
 ```bash
+# Con uv
+uv run --isolated inoltro-email check-file impegnativa.pdf --show-text
+
+# Oppure con python direttamente
 python -m inoltro_email check-file impegnativa.pdf --show-text
 ```
 
@@ -595,6 +623,11 @@ collaudabile senza far partire il server e senza rete.
 ## Test
 
 ```bash
+# Con uv (consigliato)
+uv sync --extra dev
+uv run --isolated pytest
+
+# Oppure con pip
 pip install -r requirements-dev.txt
 pytest
 ```

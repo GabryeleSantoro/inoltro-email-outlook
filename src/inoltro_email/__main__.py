@@ -56,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=None, help="porta di ascolto (default: api.port)")
     serve.add_argument("--reload", action="store_true",
                        help="ricarica automaticamente al cambiare del codice (sviluppo)")
+    serve.add_argument("--flow-path", type=Path, default=None,
+                       help="percorso del file .lnk del flusso Power Automate da eseguire")
+    serve.add_argument("--flow-timer", type=int, default=None,
+                       help="intervallo in secondi tra le esecuzioni del flusso (default: 60)")
 
     analizza = sub.add_parser("analizza", help="analizza un payload JSON di Power Automate")
     analizza.add_argument("path", type=Path, nargs="?", default=None,
@@ -82,6 +86,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             settings.api.host = args.host
         if args.port:
             settings.api.port = args.port
+        flow_path = args.flow_path
+        flow_timer = args.flow_timer or 60
 
     settings.ensure_directories()
     started_at = datetime.now()
@@ -100,7 +106,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         if args.command == "serve":
-            return _cmd_serve(settings, reload=args.reload)
+            return _cmd_serve(settings, reload=args.reload, flow_path=flow_path, flow_timer=flow_timer)
         if args.command == "analizza":
             return _cmd_analizza(settings, args.path)
         return _cmd_check_file(settings, args.path, args.show_text)
@@ -112,10 +118,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 # ------------------------------------------------------------------ comandi
 
 
-def _cmd_serve(settings: Settings, *, reload: bool = False) -> int:
+def _cmd_serve(settings: Settings, *, reload: bool = False, flow_path: Optional[Path] = None, flow_timer: int = 60) -> int:
     from .api.server import run
 
-    run(settings, reload=reload)
+    run(settings, reload=reload, flow_path=flow_path, flow_timer=flow_timer)
     return 0
 
 

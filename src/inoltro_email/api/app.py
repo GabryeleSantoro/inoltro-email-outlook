@@ -17,6 +17,7 @@ import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
@@ -26,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import __version__
 from ..analysis import EmailAnalyzer
 from ..config import Settings
+from ..flow_runner import FlowRunner
 from ..inbound import InboundError, parse_email
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
@@ -94,6 +96,8 @@ def create_app(
     settings: Optional[Settings] = None,
     *,
     analyzer: Optional[EmailAnalyzer] = None,
+    flow_path: Optional[Path] = None,
+    flow_timer: int = 60,
 ) -> FastAPI:
     """Costruisce l'applicazione.
 
@@ -111,6 +115,13 @@ def create_app(
             )
         else:
             application.state.analyzer = analyzer
+
+        flow_runner: Optional[FlowRunner] = None
+        if flow_path:
+            flow_runner = FlowRunner(flow_path=flow_path, interval_seconds=flow_timer)
+            flow_runner.start()
+            application.state.flow_runner = flow_runner
+
         logger.info(
             "Servizio pronto: screening su %s, criteri sul contenuto %s.",
             " / ".join(settings.screening.keywords),
@@ -124,9 +135,6 @@ def create_app(
             settings.confidence.min_percent_for_ocr,
         )
         if settings.local_files.enabled and not settings.local_files.allowed_directories:
-            # I file indicati nel payload vengono caricati su ocr.space: senza
-            # un elenco di cartelle ammesse, chi puo' chiamare il servizio
-            # sceglie quali file della macchina ci finiscono.
             logger.warning(
                 "Allegati per percorso attivi senza 'local_files.allowed_directories': "
                 "qualunque file del disco con estensione ammessa puo' essere letto e "
@@ -136,6 +144,8 @@ def create_app(
         try:
             yield
         finally:
+            if flow_runner is not None:
+                flow_runner.stop()
             if owned_client is not None:
                 owned_client.close()
 
