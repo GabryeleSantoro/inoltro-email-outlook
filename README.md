@@ -186,7 +186,7 @@ src/inoltro_email/
 ├── pipeline.py        orchestrazione: allegati -> testo -> criteri -> inoltro
 ├── state.py           registro SQLite anti-duplicato
 ├── models.py          strutture dati condivise
-├── logging_setup.py   log su console e su file rotante
+├── logging_setup.py   log su console e su un file per ogni sessione
 ├── ocr/
 │   ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
 │   └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
@@ -251,3 +251,15 @@ vengono letti in locale.
 **Dove finiscono i dati.** Gli allegati sono salvati in una cartella temporanea
 di sistema, rimossa al termine dell'elaborazione di ogni messaggio. Restano su
 disco soltanto il registro `state/processed.sqlite3` e i log in `logs/`.
+
+**I log.** Ogni avvio del programma scrive il proprio file, con data e ora di
+inizio nel nome: `logs/inoltro-20250521-091500.log` per una sessione partita il
+21 maggio 2025 alle 9:15. Le esecuzioni non si mescolano piu' e la prima riga di
+ogni file dice quale comando e' stato lanciato e quando. Si regola dalla sezione
+`logging` di `config.yaml`:
+
+| Chiave | Effetto |
+| --- | --- |
+| `file` | modello del nome (`logs/inoltro.log`), da cui si ricava quello di sessione |
+| `per_session` | `false` per tornare a un unico file cumulativo |
+| `keep_sessions` | quanti file conservare; i piu' vecchi vengono cancellati all'avvio (`0` = tutti) |
