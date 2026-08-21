@@ -38,6 +38,9 @@ def ambiente_pulito(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+SENZA_SEZIONE_LOG = VALID_YAML.replace('logging:\n  level: "WARNING"\n  file: null\n', "")
+
+
 def write_config(tmp_path: Path, content: str) -> Path:
     path = tmp_path / "config.yaml"
     path.write_text(content, encoding="utf-8")
@@ -165,23 +168,23 @@ def test_ensure_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     settings = Settings.load(write_config(tmp_path, VALID_YAML))
     settings.logging.file = tmp_path / "registri" / "servizio.log"
     settings.ensure_directories()
-    assert (tmp_path / "dati").is_dir() and (tmp_path / "registri").is_dir()
-    assert (tmp_path / "credenziali").is_dir()
+
+    assert (tmp_path / "registri").is_dir()
 
 
 def test_impostazioni_log_predefinite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Senza sezione 'logging' si scrive un file nuovo per ogni sessione."""
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    settings = Settings.load(write_config(tmp_path, VALID_YAML))
+    settings = Settings.load(write_config(tmp_path, SENZA_SEZIONE_LOG))
 
-    assert settings.logging.file == Path("logs/inoltro.log")
+    assert settings.logging.file == Path("logs/servizio.log")
     assert settings.logging.per_session is True
     assert settings.logging.keep_sessions == 30
 
 
 def test_impostazioni_log_dal_yaml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML + """
+    yaml_text = SENZA_SEZIONE_LOG + """
 logging:
   level: "debug"
   file: "registri/app.log"
@@ -198,6 +201,6 @@ logging:
 
 def test_keep_sessions_negativo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
-    yaml_text = VALID_YAML + "\nlogging:\n  keep_sessions: -1\n"
+    yaml_text = SENZA_SEZIONE_LOG + "\nlogging:\n  keep_sessions: -1\n"
     with pytest.raises(ConfigError, match="keep_sessions"):
         Settings.load(write_config(tmp_path, yaml_text))

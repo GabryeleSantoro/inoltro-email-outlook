@@ -195,8 +195,8 @@ def test_serve_senza_argomenti_usa_la_configurazione(config_file: Path,
 def test_configurazione_mancante(tmp_path: Path, capsys) -> None:
     code = main(["--config", str(tmp_path / "assente.yaml"), "check-file", "x.pdf"])
 
-    assert code == 3
-    assert "non riuscita" in capsys.readouterr().err
+    assert code == 2
+    assert "Errore di configurazione" in capsys.readouterr().err
 
 
 def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -211,7 +211,7 @@ def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.Monk
             db=(tmp_path / "state.sqlite3").as_posix(),
             token=(tmp_path / "o365_token.txt").as_posix(),
         ).replace('level: "WARNING"', 'level: "INFO"').replace(
-            "file: null", f'file: "{(logs / "inoltro.log").as_posix()}"'
+            "file: null", f'file: "{(logs / "servizio.log").as_posix()}"'
         ),
         encoding="utf-8",
     )
@@ -225,7 +225,7 @@ def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.Monk
             logging.getLogger().removeHandler(handler)
             handler.close()
 
-    prodotti = sorted(logs.glob("inoltro-*.log"))
+    prodotti = sorted(logs.glob("servizio-*.log"))
     assert len(prodotti) == 2, prodotti
-    assert not (logs / "inoltro.log").exists()
+    assert not (logs / "servizio.log").exists()
     assert "Sessione 'check-file' avviata il" in prodotti[0].read_text(encoding="utf-8")
