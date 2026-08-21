@@ -1,71 +1,65 @@
 """Interfaccia a riga di comando.
 
-Quattro modi d'uso:
+Tre modi d'uso:
 
-* ``authenticate`` - consenso una tantum all'applicazione: salva il token che
-                     servira' a tutti gli avvii successivi;
-* ``watch``        - controlla la casella ogni ``poll_interval_minutes`` e
-                     tratta i messaggi non letti appena arrivati;
-* ``run-once``     - esamina una sola volta i messaggi recenti (adatto anche a
-                     un'attivita' pianificata o a un cron);
-* ``check-file``   - prova OCR e regole su un file locale, senza toccare la
-                     casella: e' il modo piu' rapido per verificare chiave API
-                     e criteri.
+* ``serve``      - avvia il servizio HTTP che Power Automate interroga;
+* ``analizza``   - analizza un payload JSON gia' salvato su file (o letto da
+                   standard input): e' il modo piu' rapido per provare regole e
+                   punteggi senza far partire il server;
+* ``check-file`` - prova OCR e criteri su un singolo PDF o immagine, senza
+                   passare da un'email.
 
-Tutti i comandi girano su qualsiasi sistema operativo: l'accesso alla posta
-avviene via Microsoft Graph, senza Outlook Desktop.
+Tutti i comandi girano su qualsiasi sistema operativo: non serve Outlook, la
+posta arriva dal flusso Power Automate.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+from .analysis import EmailAnalyzer
+from .api.responses import analysis_to_dict
 from .config import ConfigError, Settings
+from .inbound import InboundError, parse_email
+from .rawjson import RawJsonError, loads_tolerant
 from .logging_setup import setup_logging
 from .matching import evaluate
-from .models import AttachmentFile, Decision
+from .models import AttachmentFile, Esito
 from .ocr.extractor import TextExtractor
 from .ocr.ocrspace import OcrSpaceClient
-from .outlook.client import OutlookError
-from .pipeline import ForwardPipeline
-from .state import ProcessedStore
 
 logger = logging.getLogger("inoltro_email")
-
-DEFAULT_CONFIG = Path("config.yaml")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="inoltro-email",
-        description="Inoltra automaticamente le email Outlook i cui allegati "
-                    "soddisfano i criteri configurati (lettura via ocr.space).",
+        description="Servizio HTTP che analizza le email di telemedicina "
+                    "inviate da Power Automate (screening, OCR, sentiment).",
     )
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG,
-                        help=f"percorso del file di configurazione (default: {DEFAULT_CONFIG})")
+    parser.add_argument("--config", type=Path, default=None,
+                        help="percorso del file di configurazione (default: config.yaml se esiste)")
     parser.add_argument("--log-level", default=None,
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="sovrascrive logging.level della configurazione")
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--dry-run", dest="dry_run", action="store_true", default=None,
-                       help="non invia nulla, mostra soltanto cosa verrebbe inoltrato")
-    group.add_argument("--no-dry-run", dest="dry_run", action="store_false",
-                       help="inoltra davvero i messaggi conformi")
 
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("authenticate", help="autorizza l'applicazione e salva il token")
-    sub.add_parser("watch", help="controlla la posta a intervalli regolari")
 
-    run_once = sub.add_parser("run-once", help="esamina una volta i messaggi recenti")
-    run_once.add_argument("--minutes", type=int, default=None,
-                          help="finestra temporale da esaminare (default: outlook.catch_up_minutes)")
-    run_once.add_argument("--include-read", action="store_true",
-                          help="esamina anche i messaggi gia' letti (default: solo i non letti)")
+    serve = sub.add_parser("serve", help="avvia il servizio HTTP")
+    serve.add_argument("--host", default=None, help="indirizzo di ascolto (default: api.host)")
+    serve.add_argument("--port", type=int, default=None, help="porta di ascolto (default: api.port)")
+    serve.add_argument("--reload", action="store_true",
+                       help="ricarica automaticamente al cambiare del codice (sviluppo)")
+
+    analizza = sub.add_parser("analizza", help="analizza un payload JSON di Power Automate")
+    analizza.add_argument("path", type=Path, nargs="?", default=None,
+                          help="file JSON da analizzare ('-' o assente: standard input)")
 
     check = sub.add_parser("check-file", help="prova OCR e criteri su un file locale")
     check.add_argument("path", type=Path, help="PDF o immagine da analizzare")
@@ -83,8 +77,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Errore di configurazione: {exc}", file=sys.stderr)
         return 2
 
-    if args.dry_run is not None:
-        settings.forward.dry_run = args.dry_run
+    if args.command == "serve":
+        if args.host:
+            settings.api.host = args.host
+        if args.port:
+            settings.api.port = args.port
+
     settings.ensure_directories()
     started_at = datetime.now()
     log_file = setup_logging(
@@ -101,24 +99,72 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info("Log di questa sessione: %s", log_file)
 
     try:
-        if args.command == "check-file":
-            return _cmd_check_file(settings, args.path, args.show_text)
-        if args.command == "authenticate":
-            return _cmd_authenticate(settings)
-        if args.command == "run-once":
-            return _cmd_run_once(settings, args.minutes, unread_only=not args.include_read)
-        return _cmd_watch(settings)
+        if args.command == "serve":
+            return _cmd_serve(settings, reload=args.reload)
+        if args.command == "analizza":
+            return _cmd_analizza(settings, args.path)
+        return _cmd_check_file(settings, args.path, args.show_text)
     except KeyboardInterrupt:
         logger.info("Interrotto dall'utente.")
         return 130
-    except OutlookError as exc:
-        # Es. credenziali mancanti o token scaduto: il traceback non
-        # aggiungerebbe nulla di utile a chi usa il programma.
-        print(f"Errore Outlook: {exc}", file=sys.stderr)
-        return 3
 
 
 # ------------------------------------------------------------------ comandi
+
+
+def _cmd_serve(settings: Settings, *, reload: bool = False) -> int:
+    from .api.server import run
+
+    run(settings, reload=reload)
+    return 0
+
+
+def _cmd_analizza(settings: Settings, path: Optional[Path]) -> int:
+    """Analizza un payload salvato su file: stessa risposta dell'endpoint HTTP."""
+    try:
+        raw = sys.stdin.read() if path is None or str(path) == "-" else path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"File non leggibile: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        payload, repairs = loads_tolerant(raw)
+    except RawJsonError as exc:
+        print(f"JSON non valido: {exc}", file=sys.stderr)
+        return 2
+
+    if repairs:
+        print(f"JSON riparato in lettura: {'; '.join(repairs)}", file=sys.stderr)
+
+    try:
+        email = parse_email(
+            payload,
+            include_inline_images=settings.attachments.include_inline_images,
+            max_attachment_bytes=settings.attachments.max_bytes,
+            local_files=settings.local_files,
+        )
+    except InboundError as exc:
+        print(f"Payload non interpretabile: {exc}", file=sys.stderr)
+        return 2
+
+    if repairs:
+        email.warnings.append("JSON non valido riparato in lettura: " + "; ".join(repairs))
+
+    with OcrSpaceClient(settings.ocr) as ocr_client:
+        analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr_client))
+        analysis = analyzer.analyze(email)
+
+    print(json.dumps(
+        analysis_to_dict(
+            analysis,
+            include_text=settings.attachments.return_text,
+            max_text_chars=settings.attachments.max_text_chars,
+        ),
+        indent=2, ensure_ascii=False,
+    ))
+    # L'esito e' nel JSON: il codice di uscita segnala solo se l'analisi si e'
+    # interrotta, non se l'email era conforme.
+    return 1 if analysis.esito is Esito.ERRORE else 0
 
 
 def _cmd_check_file(settings: Settings, path: Path, show_text: bool) -> int:
@@ -142,86 +188,12 @@ def _cmd_check_file(settings: Settings, path: Path, show_text: bool) -> int:
     report = evaluate(extracted.text, settings.rules)
     print(f"Caratteri : {len(extracted.text)}")
     print(f"Criteri   : {report.summary()}")
-    print(f"Esito     : {'CONFORME - la mail verrebbe inoltrata' if report.matched else 'non conforme'}\n")
+    print(f"Esito     : {'CONFORME' if report.matched else 'non conforme'}\n")
     if show_text:
         print("--- testo estratto ---")
         print(extracted.text)
         print("--- fine testo ---\n")
     return 0 if report.matched else 1
-
-
-def _cmd_authenticate(settings: Settings) -> int:
-    """Consenso una tantum: apre l'URL di autorizzazione e salva il token."""
-    from .outlook.client import OutlookClient
-
-    client = OutlookClient(settings.outlook, settings.attachments.allowed_extensions)
-    if not client.authenticate():
-        print("Autenticazione non riuscita: nessun token salvato.", file=sys.stderr)
-        return 3
-
-    print(f"\nAutenticazione riuscita: token salvato in {settings.outlook.token_path}.")
-    print("Da ora in poi 'watch' e 'run-once' partono senza chiedere nulla.\n")
-    return 0
-
-
-def _cmd_run_once(settings: Settings, minutes: Optional[int], unread_only: bool = True) -> int:
-    window = minutes if minutes is not None else settings.outlook.catch_up_minutes
-    with _build_context(settings) as (client, pipeline):
-        results = pipeline.process_recent(window, unread_only=unread_only)
-
-    forwarded = sum(1 for result in results if result.forwarded)
-    errors = sum(1 for result in results if result.decision is Decision.ERROR)
-    logger.info("Esaminati %d messaggi: %d inoltrati, %d errori.", len(results), forwarded, errors)
-    return 1 if errors else 0
-
-
-def _cmd_watch(settings: Settings) -> int:
-    from .outlook.poller import watch
-
-    with _build_context(settings) as (_client, pipeline):
-        watch(settings, pipeline)
-    return 0
-
-
-# ------------------------------------------------------------------- setup
-
-
-class _Context:
-    """Costruisce e chiude in modo ordinato client di posta, OCR e store."""
-
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-        self._ocr: Optional[OcrSpaceClient] = None
-        self._store: Optional[ProcessedStore] = None
-
-    def __enter__(self):
-        from .outlook.client import OutlookClient
-
-        client = OutlookClient(
-            self._settings.outlook,
-            allowed_extensions=self._settings.attachments.allowed_extensions,
-        )
-        client.connect()
-
-        self._ocr = OcrSpaceClient(self._settings.ocr)
-        self._store = ProcessedStore(self._settings.storage.db_path)
-        pipeline = ForwardPipeline(
-            settings=self._settings,
-            mail_client=client,
-            extractor=TextExtractor(self._settings, self._ocr),
-            store=self._store,
-        )
-        return client, pipeline
-
-    def __exit__(self, *_exc_info: object) -> None:
-        if self._ocr is not None:
-            self._ocr.close()
-        if self._store is not None:
-            self._store.close()
-
-
-def _build_context(settings: Settings) -> _Context:
-    return _Context(settings)
 
 
 if __name__ == "__main__":

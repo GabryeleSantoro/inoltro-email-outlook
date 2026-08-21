@@ -88,7 +88,11 @@ def setup_logging(
 
     formatter = logging.Formatter(LOG_FORMAT)
 
-    console = logging.StreamHandler(sys.stdout)
+    # I log vanno su stderr, non su stdout: il comando "analizza" stampa il
+    # JSON del verdetto su stdout, e con i due flussi mescolati non si puo'
+    # redirigere il risultato in un file. Ora ogni allegato passa dall'OCR e i
+    # log sono parecchi, quindi la distinzione conta.
+    console = logging.StreamHandler(sys.stderr)
     console.setFormatter(formatter)
     root.addHandler(console)
 

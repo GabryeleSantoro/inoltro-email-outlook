@@ -9,10 +9,8 @@ venv/
 # Configurazione e segreti locali
 .env
 config.yaml
-*o365_token*
 
 # Dati runtime
-state/
 logs/
 
 # Test
