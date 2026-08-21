@@ -153,3 +153,18 @@ logging:
   # Quanti log di sessione conservare: i piu' vecchi vengono cancellati.
   # 0 = non cancellare nulla.
   keep_sessions: 30
+
+# Click automatico sul popup di conferma di Power Automate Desktop.
+# Quando un flow viene avviato da .lnk, PAD mostra una finestra che chiede
+# "Continue" prima di eseguire. Questa sezione gestisce il click automatico
+# con blocco temporaneo dell'input utente (pywinauto, solo Windows).
+flow_popup:
+  # true = cerca e clicca "Continue" dopo l'avvio del flusso.
+  # false = ignora il popup (utile per debug o se PAD non lo mostra).
+  auto_continue: true
+  # Testo (o regex) del titolo della finestra di conferma.
+  popup_title: "Power Automate"
+  # Testo del pulsante da cliccare.
+  popup_button: "Continua"
+  # Secondi massimi di attesa per la comparsa del popup.
+  popup_timeout: 10

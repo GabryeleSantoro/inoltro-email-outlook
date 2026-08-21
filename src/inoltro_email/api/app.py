@@ -118,7 +118,14 @@ def create_app(
 
         flow_runner: Optional[FlowRunner] = None
         if flow_path:
-            flow_runner = FlowRunner(flow_path=flow_path, interval_seconds=flow_timer)
+            flow_runner = FlowRunner(
+                flow_path=flow_path,
+                interval_seconds=flow_timer,
+                auto_continue=settings.flow_popup.auto_continue,
+                popup_title=settings.flow_popup.popup_title,
+                popup_button=settings.flow_popup.popup_button,
+                popup_timeout=settings.flow_popup.popup_timeout,
+            )
             flow_runner.start()
             application.state.flow_runner = flow_runner
 

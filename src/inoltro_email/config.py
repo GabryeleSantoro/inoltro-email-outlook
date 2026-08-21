@@ -195,6 +195,16 @@ class LoggingSettings:
 
 
 @dataclass
+class FlowPopupSettings:
+    """Impostazioni per il click automatico sul popup di conferma PAD."""
+
+    auto_continue: bool = True
+    popup_title: str = "Power Automate"
+    popup_button: str = "Continua"
+    popup_timeout: float = 10.0
+
+
+@dataclass
 class Settings:
     api: ApiSettings = field(default_factory=ApiSettings)
     screening: ScreeningSettings = field(default_factory=ScreeningSettings)
@@ -205,6 +215,7 @@ class Settings:
     confidence: ConfidenceSettings = field(default_factory=ConfidenceSettings)
     sentiment: SentimentSettings = field(default_factory=SentimentSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
+    flow_popup: FlowPopupSettings = field(default_factory=FlowPopupSettings)
 
     @classmethod
     def load(
@@ -269,6 +280,7 @@ class Settings:
         confidence_raw = section("confidence")
         sentiment_raw = section("sentiment")
         log_raw = section("logging")
+        flow_popup_raw = section("flow_popup")
 
         api = ApiSettings(
             host=str(api_raw.get("host", ApiSettings.host)),
@@ -367,6 +379,14 @@ class Settings:
             per_session=bool(log_raw.get("per_session", LoggingSettings.per_session)),
             keep_sessions=int(log_raw.get("keep_sessions", LoggingSettings.keep_sessions)),
         )
+        flow_popup = FlowPopupSettings(
+            auto_continue=bool(flow_popup_raw.get("auto_continue", FlowPopupSettings.auto_continue)),
+            popup_title=str(flow_popup_raw.get("popup_title", FlowPopupSettings.popup_title)),
+            popup_button=str(flow_popup_raw.get("popup_button", FlowPopupSettings.popup_button)),
+            popup_timeout=float(
+                flow_popup_raw.get("popup_timeout", FlowPopupSettings.popup_timeout)
+            ),
+        )
         return cls(
             api=api,
             screening=screening,
@@ -377,6 +397,7 @@ class Settings:
             confidence=confidence,
             sentiment=sentiment,
             logging=logging_settings,
+            flow_popup=flow_popup,
         )
 
     def validate(self, *, require_api_key: bool = True) -> None:

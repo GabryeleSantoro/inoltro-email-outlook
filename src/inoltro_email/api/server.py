@@ -18,10 +18,14 @@ from .app import create_app
 
 logger = logging.getLogger(__name__)
 
+import os
 
 def build() -> "object":
     """Fabbrica per ``uvicorn --factory``: legge la configurazione da sola."""
-    return create_app()
+    flow_path_env = os.environ.get("INOLTRO_EMAIL_FLOW_PATH")
+    flow_path = Path(flow_path_env) if flow_path_env else None
+    flow_timer = int(os.environ.get("INOLTRO_EMAIL_FLOW_TIMER", "60"))
+    return create_app(flow_path=flow_path, flow_timer=flow_timer)
 
 
 def run(
@@ -53,6 +57,9 @@ def run(
     app = create_app(settings, flow_path=flow_path, flow_timer=flow_timer)
 
     if reload:
+        if flow_path:
+            os.environ["INOLTRO_EMAIL_FLOW_PATH"] = str(flow_path.resolve())
+            os.environ["INOLTRO_EMAIL_FLOW_TIMER"] = str(flow_timer)
         uvicorn.run(
             "inoltro_email.api.server:build",
             factory=True,
