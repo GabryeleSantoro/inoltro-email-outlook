@@ -1,7 +1,48 @@
-# Configurazione di inoltro-email-outlook
-# Copiare in `config.yaml` e adattare. I segreti NON vanno qui: la chiave di
-# ocr.space e le credenziali dell'applicazione Microsoft stanno nel file .env
-# (OCR_SPACE_API_KEY, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID).
+# Configurazione del servizio di analisi email (telemedicina)
+# Copiare in `config.yaml` e adattare. Il file e' facoltativo: senza di esso
+# valgono i valori qui indicati come predefiniti.
+# I segreti NON vanno qui: la chiave di ocr.space e quella condivisa con Power
+# Automate stanno nel file .env (OCR_SPACE_API_KEY, SERVICE_API_KEY).
+
+api:
+  # 0.0.0.0 = accetta connessioni da qualsiasi interfaccia (necessario in un
+  # container). Le variabili d'ambiente API_HOST e PORT hanno la precedenza.
+  host: "0.0.0.0"
+  port: 8000
+  # Corpo massimo della richiesta: gli allegati arrivano in base64, quindi
+  # occupano circa 4/3 della loro dimensione reale.
+  max_request_bytes: 33554432
+  title: "Servizio telemedicina - analisi email"
+
+# Prima verifica, su oggetto e corpo del messaggio. Se non la supera, l'email
+# non viene nemmeno passata all'OCR.
+screening:
+  keywords:
+    - "telemedicina"
+    - "televisita"
+  # any = basta uno dei termini (telemedicina OPPURE televisita)
+  # all = servono tutti
+  mode: "any"
+  # false (predefinito) = gli allegati si leggono comunque, anche se oggetto e
+  # corpo non parlano di telemedicina: il contenuto di un'impegnativa puo'
+  # ribaltare un oggetto che non dice nulla, e il verdetto si vuole con tutti i
+  # dati alla mano. true = niente OCR se lo screening non passa (risparmia
+  # quota, ma perde i messaggi con l'oggetto generico).
+  stop_on_failure: false
+
+# Criteri che deve soddisfare il testo letto dagli allegati e dalle foto.
+rules:
+  keywords:
+    - "telemedicina"
+  # Codici: confronto tollerante a spazi e separatori (15 0 1A, 15-01A, ...).
+  codes:
+    - "1501A"
+  # all = servono TUTTE le keyword E TUTTI i codici (AND)
+  # any = ne basta uno qualsiasi (OR)
+  mode: "all"
+  # Corregge le confusioni tipiche dell'OCR sui codici (O/0, I/1, L/1, S/5, B/8).
+  # Non viene mai applicato alle keyword.
+  fuzzy_ocr_confusions: true
 
 ocr:
   endpoint: "https://api.ocr.space/parse/image"
@@ -15,67 +56,92 @@ ocr:
   # Con un piano PRO si possono alzare (es. 5242880 e 999).
   max_file_bytes: 1048576
   max_pdf_pages_per_request: 3
-
-rules:
-  # Parole da cercare nel testo estratto dall'allegato.
-  keywords:
-    - "televisita"
-  # Codici: confronto tollerante a spazi e separatori (15 A 10, 15-A10, ...).
-  codes:
-    - "1501A"
-  # all = servono TUTTE le keyword E TUTTI i codici (AND)
-  # any = ne basta uno qualsiasi (OR)
-  mode: "all"
-  # Corregge le confusioni tipiche dell'OCR sui codici (O/0, I/1, L/1, S/5, B/8).
-  # Non viene mai applicato alle keyword.
-  fuzzy_ocr_confusions: true
-
-forward:
-  to:
-    - "destinatario@example.com"
-  cc: []
-  subject_prefix: "[TELEVISITA 1501A] "
-  body_note: "Inoltro automatico: l'allegato soddisfa i criteri configurati."
-  # true = simula soltanto, non invia nulla. Metterlo a false per inoltrare davvero.
-  dry_run: true
-
-outlook:
-  # Cartella da sorvegliare. "Inbox" = Posta in arrivo.
-  # Per una sottocartella usare il percorso: "Inbox/Televisite"
-  folder: "Inbox"
-  # Ogni quanto interrogare la casella (minuti).
-  poll_interval_minutes: 5
-  # Quanto indietro guardare a ogni controllo (minuti): tenerlo >= all'intervallo.
-  lookback_minutes: 5
-  # true = si esaminano solo i messaggi ancora da leggere.
-  unread_only: true
-  # Al primo controllo dopo l'avvio guarda indietro di N minuti (recupera cio'
-  # che e' arrivato mentre il programma era spento). 0 per disattivare.
-  catch_up_minutes: 30
-  # Quanti messaggi al massimo scaricare per ogni controllo.
-  max_messages_per_poll: 50
-  # Categoria Outlook applicata ai messaggi inoltrati (vuoto per disattivare).
-  processed_category: "Inoltrata-Televisita"
-  # Come ci si autentica sull'applicazione registrata su Microsoft Entra ID:
-  #   authorization -> a nome dell'utente, con segreto client (consigliato)
-  #   public        -> a nome dell'utente, applicazione senza segreto
-  #   credentials   -> solo applicazione, senza utente (richiede 'mailbox')
-  auth_flow: "authorization"
-  # Casella da leggere: obbligatoria con auth_flow "credentials", altrimenti si
-  # usa quella dell'utente che ha dato il consenso.
-  mailbox: ""
-  # Dove viene conservato il token (contiene il refresh token: non versionarlo).
-  token_path: "state/o365_token.txt"
-  request_timeout_seconds: 60
+  # false (predefinito) = un PDF che si riesce a leggere direttamente non passa
+  # dall'OCR: il suo livello di testo e' esatto e non costa nulla. All'OCR ci si
+  # va solo se la lettura fallisce o non produce testo utile (PDF scansionato).
+  # true = anche i PDF leggibili passano dall'OCR e i due testi vengono uniti:
+  # recupera cio' che nel PDF e' solo immagine, al prezzo di una chiamata per
+  # ogni documento.
+  always_call: false
+  # true = un'immagine oltre max_file_bytes viene ridimensionata e inviata
+  # comunque, invece di essere saltata. Una foto di impegnativa scattata col
+  # telefono supera sempre il MB del piano gratuito.
+  resize_oversized_images: true
 
 attachments:
-  allowed_extensions:
-    [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]
-  # Allegati piu' grandi di questo vengono ignorati (byte).
+  # Il servizio legge solo PDF e immagini. Questo elenco puo' restringere i
+  # formati, non allargarli: un'estensione non supportata viene ignorata e
+  # segnalata nei log. Le GIF sono escluse perche' ocr.space le rifiuta (e in
+  # una email aziendale sono quasi sempre il logo animato della firma).
+  allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
+  # File piu' grandi di questo vengono ignorati (byte).
   max_bytes: 10485760
+  # Analizza anche le foto incorporate nel corpo (allegati inline e immagini
+  # "data:" dentro l'HTML): spesso l'impegnativa e' fotografata nel messaggio.
+  include_inline_images: true
+  # Quanti file al massimo passare all'OCR per ogni email.
+  max_files: 10
+  # true (predefinito) = si leggono tutti i file allegati, anche dopo averne
+  # trovato uno conforme: il verdetto tiene conto di tutto quello che e'
+  # arrivato. false = ci si ferma al primo conforme (meno chiamate all'OCR).
+  analyze_all: true
+  # Restituisce nella risposta il testo letto da ogni documento. E' un dato
+  # sanitario: chi non lo vuole in giro lo mette a false.
+  return_text: true
+  # Quanto testo restituire per documento (0 = tutto). Serve solo a non far
+  # esplodere la risposta con un referto di venti pagine.
+  max_text_chars: 20000
 
-storage:
-  db_path: "state/processed.sqlite3"
+# Allegati che il flusso non manda in base64 ma indica con il percorso su disco
+# (campo "attchment" del payload). Quei percorsi sono la base per l'OCR: il file
+# viene letto da dove si trova, senza ricopiarlo.
+local_files:
+  enabled: true
+  # Se valorizzato, si accettano SOLO percorsi dentro queste cartelle. Da
+  # riempire quando il servizio e' raggiungibile da altre macchine: evita che un
+  # payload possa far leggere un file qualsiasi del disco.
+  # allowed_directories:
+  #   - "C:/Users/user/Documents/Power Automate/Allegati"
+  # Dove cercare il file per nome se il percorso indicato non esiste (serve se
+  # il servizio gira su una macchina diversa da quella del flusso).
+  # search_directories:
+  #   - "/srv/allegati"
+  allowed_directories: []
+  search_directories: []
+
+# Percentuali di sicurezza restituite nella risposta.
+confidence:
+  # Sopra questa percentuale il messaggio e' considerato di telemedicina
+  # ("telemedicina.confermato" nella risposta).
+  telemedicine_threshold: 50
+  # Sopra questa percentuale e' considerato una prenotazione di telemedicina.
+  # Insieme alla precedente determina "prenotazione_telemedicina".
+  booking_threshold: 60
+  # Sotto questa percentuale, calcolata prima dell'OCR su oggetto, corpo e nomi
+  # dei file, non si spende una chiamata all'OCR. Zero (predefinito) = si legge
+  # sempre tutto. Alzandola si risparmia quota su newsletter e fogli di accessi,
+  # al prezzo di non vedere il contenuto dei loro allegati.
+  min_percent_for_ocr: 0
+  # Sopra questa percentuale la prenotazione e' considerata *certa*: e' cio' che
+  # fa rispondere 200 invece di 202. Deve stare sopra booking_threshold.
+  # Alzandola si risponde 200 solo ai casi lampanti, abbassandola si accettano
+  # piu' messaggi senza revisione umana.
+  certainty_threshold: 80
+  # Taratura fine: sono i termini costanti dei due punteggi, in log-odds. Piu'
+  # sono negativi, piu' indizi servono per arrivare a una percentuale alta.
+  telemedicine_bias: -2.2
+  booking_bias: -3.2
+
+sentiment:
+  # Sopra questo punteggio l'etichetta e' "positivo", sotto negative_threshold
+  # e' "negativo", in mezzo "neutro". Il punteggio va da -1 a +1.
+  positive_threshold: 0.15
+  negative_threshold: -0.15
+  # Da 0 a 1: sopra questa soglia il messaggio e' considerato una richiesta di
+  # prenotazione di telemedicina.
+  booking_threshold: 0.5
+  # Quanto un allegato conforme rafforza l'ipotesi "prenotazione".
+  attachment_bonus: 0.15
 
 logging:
   level: "INFO"
