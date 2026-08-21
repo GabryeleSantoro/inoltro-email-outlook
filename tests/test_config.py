@@ -168,3 +168,37 @@ def test_ensure_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     settings.ensure_directories()
     assert (tmp_path / "dati").is_dir() and (tmp_path / "registri").is_dir()
     assert (tmp_path / "credenziali").is_dir()
+
+
+def test_impostazioni_log_predefinite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Senza sezione 'logging' si scrive un file nuovo per ogni sessione."""
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    settings = Settings.load(write_config(tmp_path, VALID_YAML))
+
+    assert settings.logging.file == Path("logs/inoltro.log")
+    assert settings.logging.per_session is True
+    assert settings.logging.keep_sessions == 30
+
+
+def test_impostazioni_log_dal_yaml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + """
+logging:
+  level: "debug"
+  file: "registri/app.log"
+  per_session: false
+  keep_sessions: 5
+"""
+    settings = Settings.load(write_config(tmp_path, yaml_text))
+
+    assert settings.logging.level == "DEBUG"
+    assert settings.logging.file == Path("registri/app.log")
+    assert settings.logging.per_session is False
+    assert settings.logging.keep_sessions == 5
+
+
+def test_keep_sessions_negativo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave")
+    yaml_text = VALID_YAML + "\nlogging:\n  keep_sessions: -1\n"
+    with pytest.raises(ConfigError, match="keep_sessions"):
+        Settings.load(write_config(tmp_path, yaml_text))
