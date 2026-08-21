@@ -146,8 +146,8 @@ sentiment:
 logging:
   level: "INFO"
   # Modello del nome: con per_session attivo ogni avvio scrive il proprio file,
-  # con data e ora di inizio nel nome (logs/inoltro-20250521-091500.log).
-  file: "logs/inoltro.log"
+  # con data e ora di inizio nel nome (logs/servizio-20250521-091500.log).
+  file: "logs/servizio.log"
   # false = si torna a un unico file cumulativo (quello indicato sopra).
   per_session: true
   # Quanti log di sessione conservare: i piu' vecchi vengono cancellati.
