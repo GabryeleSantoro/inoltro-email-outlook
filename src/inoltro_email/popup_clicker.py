@@ -325,6 +325,61 @@ def _click_button_win32(window, button_text: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Dump diagnostico
+# ---------------------------------------------------------------------------
+
+def _dump_control(ctrl, indent: int = 0) -> str:
+    """Serializza un singolo controllo pywinauto in una riga leggibile."""
+    prefix = "  " * indent
+    try:
+        text = ctrl.window_text() or ""
+        ei = getattr(ctrl, "element_info", None)
+        ctype = getattr(ei, "control_type", "?") if ei else "?"
+        cls = getattr(ei, "class_name", "?") if ei else "?"
+        auto_id = getattr(ei, "automation_id", "?") if ei else "?"
+        try:
+            r = ctrl.rectangle()
+            rect = f"L{r.left},T{r.top},R{r.right},B{r.bottom}"
+        except Exception:
+            rect = "?"
+        return f"{prefix}[{ctype}] class={cls} id='{auto_id}' text='{text}' rect={rect}"
+    except Exception as e:
+        return f"{prefix}(errore: {e})"
+
+
+def _dump_window_tree(window) -> list[str]:
+    """Restituisce la lista di righe con l'albero completo dei controlli."""
+    lines: list[str] = []
+    lines.append(_dump_control(window, indent=0))
+    try:
+        for child in window.descendants():
+            lines.append(_dump_control(child, indent=1))
+    except Exception as e:
+        lines.append(f"  (descendants() fallito: {e})")
+    return lines
+
+
+def _dump_all_visible_windows(backend: str = "uia") -> list[str]:
+    """Elenca tutte le finestre visibili con titolo."""
+    from pywinauto import Desktop
+    lines: list[str] = []
+    try:
+        desktop = Desktop(backend=backend)
+        for w in desktop.windows():
+            try:
+                if w.is_visible() and w.window_text():
+                    ei = w.element_info
+                    cls = getattr(ei, "class_name", "?")
+                    auto_id = getattr(ei, "automation_id", "?")
+                    lines.append(f"  '{w.window_text()}' (class={cls}, id={auto_id})")
+            except Exception:
+                pass
+    except Exception as e:
+        lines.append(f"  (errore Desktop: {e})")
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # API pubblica
 # ---------------------------------------------------------------------------
 
@@ -339,10 +394,18 @@ def click_continue(
     from pywinauto import Desktop
     
     logger.info("Ricerca popup '%s' (timeout=%.0fs)...", title, timeout)
+
+    # --- dump finestre visibili al momento della ricerca ---
+    logger.info("=== FINESTRE VISIBILI (inizio ricerca) ===")
+    for line in _dump_all_visible_windows("uia"):
+        logger.info(line)
+
     title_re = re.compile(re.escape(title), re.IGNORECASE)
     deadline = time.monotonic() + timeout
     
+    dumped_handles: set[int] = set()   # dump una sola volta per handle
     last_window = None
+
     while time.monotonic() < deadline:
         for backend in ["uia", "win32"]:
             try:
@@ -351,10 +414,21 @@ def click_continue(
                 for popup in windows:
                     if not popup.is_visible():
                         continue
-                        
+
                     last_window = popup
+
+                    # --- dump albero controlli appena trovata ---
+                    h = popup.handle
+                    if h not in dumped_handles:
+                        dumped_handles.add(h)
+                        logger.info(
+                            "=== POPUP TROVATO (%s) handle=%s ===",
+                            backend, h,
+                        )
+                        for line in _dump_window_tree(popup):
+                            logger.info("  TREE: %s", line)
+
                     try:
-                        # SetForegroundWindow can fail if we don't have rights, ignore
                         try:
                             SetForegroundWindow(popup.handle)
                         except Exception:
@@ -368,8 +442,16 @@ def click_continue(
                                 clicked = _click_button_win32(popup, button_text)
 
                             if clicked:
-                                logger.info("Click '%s' eseguito sulla finestra '%s'.", button_text, popup.window_text())
+                                logger.info(
+                                    "Click '%s' eseguito sulla finestra '%s'.",
+                                    button_text, popup.window_text(),
+                                )
                                 return True
+                            else:
+                                logger.warning(
+                                    "Pulsante '%s' NON trovato nella finestra '%s' (backend=%s).",
+                                    button_text, popup.window_text(), backend,
+                                )
                     except Exception:
                         logger.debug("Errore temporaneo durante il click, riprovo...")
             except Exception:
@@ -377,23 +459,19 @@ def click_continue(
                 
         time.sleep(poll_interval)
 
-    logger.warning("Popup '%s' o pulsante '%s' non trovato (timeout=%.0fs).", title, button_text, timeout)
-    # Stampa i controlli dell'ultimo tentativo se abbiamo trovato una finestra
-    if last_window is not None:
-        try:
-            for child in last_window.descendants():
-                logger.warning("Controllo presente nella finestra '%s': testo='%s', id='%s'", 
-                             last_window.window_text(), child.window_text(), getattr(child.element_info, "automation_id", ""))
-        except Exception:
-            pass
+    logger.warning(
+        "Popup '%s' o pulsante '%s' non trovato (timeout=%.0fs).",
+        title, button_text, timeout,
+    )
 
-    logger.warning("Finestre visibili al momento del timeout:")
-    try:
-        desktop = Desktop(backend="uia")
-        for w in desktop.windows():
-            if w.is_visible() and w.window_text():
-                logger.warning("  - %s", w.window_text())
-    except Exception:
-        pass
+    # --- dump finale se la finestra esiste ma il pulsante no ---
+    if last_window is not None:
+        logger.warning("=== DUMP FINALE FINESTRA '%s' ===", last_window.window_text())
+        for line in _dump_window_tree(last_window):
+            logger.warning("  TREE: %s", line)
+
+    logger.warning("=== FINESTRE VISIBILI (al timeout) ===")
+    for line in _dump_all_visible_windows("uia"):
+        logger.warning(line)
             
     return False

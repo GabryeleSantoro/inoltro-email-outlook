@@ -17,6 +17,11 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
    determinate;
 4. calcola un **punteggio di sentiment** del messaggio.
 
+Prima dell'analisi, il servizio controlla la data dell'email e il registro
+locale dei messaggi gia' visti. Con `--flow-timer 60` sono ammesse solo email
+inviate negli ultimi **120 secondi**; una email vecchia o gia' registrata non
+arriva allo screening ne' all'OCR.
+
 Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
 prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
 
@@ -190,6 +195,8 @@ uv run python -m inoltro_email serve --port 9000 --reload
 # Oppure direttamente (se il venv e' attivo)
 python -m inoltro_email serve
 python -m inoltro_email serve --port 9000 --reload
+# considera messaggi degli ultimi 120 secondi
+python -m inoltro_email serve --flow-timer 60
 ```
 
 In produzione si puo' usare direttamente uvicorn con piu' processi:
@@ -203,6 +210,12 @@ uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --wo
 ```
 
 Documentazione interattiva (generata dal servizio): <http://localhost:8000/docs>.
+
+Il registro e' `data/checked_messages.sqlite3`, creato accanto al servizio e
+ignorato da Git. Contiene localmente il payload originale di ogni messaggio
+ammesso all'analisi, compresi gli eventuali allegati base64: proteggerlo come
+un dato sanitario. Per spostarlo, quando si avvia l'app da Python, passare
+`message_store_path=Path(...)` a `create_app`.
 
 ## L'API
 
@@ -356,6 +369,13 @@ Valori possibili di `esito`:
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
+| `ignorata` | email oltre la finestra temporale o gia' presente nel registro locale |
+
+Le risposte `ignorata` usano comunque HTTP `202`, per non far ritentare il flow,
+e includono `considerata: false`, `motivo` (`fuori_finestra_temporale` oppure
+`gia_analizzato`) e `finestra_secondi`. Le email analizzate normalmente hanno
+`considerata: true`; usare questo campo nella condizione di Power Automate prima
+di inoltrare o aprire una pratica.
 
 ### I documenti letti
 

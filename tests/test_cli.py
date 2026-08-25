@@ -170,7 +170,14 @@ def test_serve_usa_host_e_porta_della_riga_di_comando(config_file: Path,
                                                       monkeypatch: pytest.MonkeyPatch) -> None:
     visto = {}
 
-    def finto_run(settings, reload=False):
+    def finto_run(
+        settings,
+        reload=False,
+        flow_path=None,
+        flow_timer=60,
+        session_log_file=None,
+        log_level=None,
+    ):
         visto["host"] = settings.api.host
         visto["port"] = settings.api.port
         visto["reload"] = reload
@@ -186,7 +193,9 @@ def test_serve_senza_argomenti_usa_la_configurazione(config_file: Path,
                                                      monkeypatch: pytest.MonkeyPatch) -> None:
     visto = {}
     monkeypatch.setattr("inoltro_email.api.server.run",
-                        lambda settings, reload=False: visto.update(port=settings.api.port))
+                        lambda settings, reload=False, flow_path=None, flow_timer=60,
+                        session_log_file=None, log_level=None:
+                        visto.update(port=settings.api.port))
     main(["--config", str(config_file), "serve"])
 
     assert visto["port"] == 8123
@@ -228,4 +237,7 @@ def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.Monk
     prodotti = sorted(logs.glob("servizio-*.log"))
     assert len(prodotti) == 2, prodotti
     assert not (logs / "servizio.log").exists()
-    assert "Sessione 'check-file' avviata il" in prodotti[0].read_text(encoding="utf-8")
+    contenuto = prodotti[0].read_text(encoding="utf-8")
+    assert "Sessione 'check-file' avviata il" in contenuto
+    assert "Sessione 'check-file' terminata il" in contenuto
+    assert "codice=2" in contenuto

@@ -12,6 +12,7 @@ config.yaml
 
 # Dati runtime
 logs/
+data/
 
 # Test
 .pytest_cache/

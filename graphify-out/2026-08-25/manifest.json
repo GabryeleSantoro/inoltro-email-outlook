@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/api/server.py": {
-    "mtime": 1787642551.5881412,
-    "seen": 1787642573.624507,
-    "ast_hash": "cd4429fee9aa1b14aa881bbcec320091",
+    "mtime": 1787642384.875078,
+    "seen": 1787642475.2952871,
+    "ast_hash": "a8d34e52e59068059c0daceea42d6a42",
     "semantic_hash": ""
   },
   "src/inoltro_email/confidence.py": {
@@ -198,9 +198,9 @@
     "semantic_hash": ""
   },
   "tests/test_logging_setup.py": {
-    "mtime": 1787642552.096746,
-    "seen": 1787642573.6245322,
-    "ast_hash": "2092be3c85cba218ebe8b265cfde842f",
+    "mtime": 1787642409.2733934,
+    "seen": 1787642475.295323,
+    "ast_hash": "5d0da2650f6f74c1ea1d67981b1e3e4a",
     "semantic_hash": ""
   },
   "tests/test_matching.py": {

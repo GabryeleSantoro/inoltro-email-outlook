@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+import sqlite3
+
 import pytest
 from conftest import FakeOcrClient, attachment_payload, email_payload, make_blank_pdf
 from fastapi.testclient import TestClient
@@ -47,6 +50,7 @@ def test_email_conforme(client: TestClient) -> None:
     assert risposta.status_code == 200
     corpo = risposta.json()
     assert corpo["esito"] == "conforme"
+    assert corpo["considerata"] is True
     assert corpo["conforme"] is True
     assert corpo["screening"] == {
         "superato": True, "termini": ["televisita"], "dove": ["oggetto", "corpo"],
@@ -55,7 +59,51 @@ def test_email_conforme(client: TestClient) -> None:
     assert corpo["criteri"]["documento"] == "impegnativa.pdf"
     assert corpo["documenti"][0]["origine"] == "allegato"
     assert corpo["sentiment"]["prenotazione"]["e_prenotazione"] is True
-    assert corpo["id_messaggio"] == "<msg-1@example.com>"
+    assert corpo["id_messaggio"].startswith("<msg-")
+
+
+def test_email_fuori_dalla_finestra_non_viene_analizzata(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    payload = email_payload(
+        receivedDateTime="",
+        date=(datetime.now(timezone.utc) - timedelta(seconds=121)).isoformat(),
+        attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())],
+    )
+    with TestClient(create_app(
+        settings, analyzer=analyzer, flow_timer=60,
+        message_store_path=tmp_path / "checked.sqlite3",
+    )) as instance:
+        risposta = instance.post("/analizza-email", json=payload)
+
+    assert risposta.status_code == 202
+    assert risposta.json()["considerata"] is False
+    assert risposta.json()["motivo"] == "fuori_finestra_temporale"
+    assert risposta.json()["finestra_secondi"] == 120
+    assert ocr.calls == []
+
+
+def test_email_gia_vista_non_viene_analizzata_due_volte(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    database = tmp_path / "checked.sqlite3"
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+    with TestClient(create_app(
+        settings, analyzer=analyzer, message_store_path=database,
+    )) as instance:
+        prima = instance.post("/analizza-email", json=payload)
+        seconda = instance.post("/analizza-email", json=payload)
+
+    assert prima.status_code == 200
+    assert seconda.status_code == 202
+    assert seconda.json()["considerata"] is False
+    assert seconda.json()["motivo"] == "gia_analizzato"
+    assert ocr.calls == ["impegnativa.pdf"]
+    with sqlite3.connect(database) as connection:
+        stored = connection.execute("SELECT payload_json FROM checked_messages").fetchone()
+    assert stored is not None and '"subject"' in stored[0]
 
 
 def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:
@@ -192,7 +240,7 @@ def _payload_del_flusso(oggetto: str, corpo_html: str, percorso: str = "") -> by
     allegato = f',"attchment":"{percorso}"' if percorso else ',"attchment":""'
     return (
         f'{{"subject":"{oggetto}","body":"{corpo_html}",'
-        f'"date":"08/20/2026 10:26"{allegato}}}'
+        f'"date":"{datetime.now().strftime("%m/%d/%Y %H:%M:%S")}"{allegato}}}'
     ).encode("utf-8")
 
 

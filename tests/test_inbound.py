@@ -17,8 +17,8 @@ def test_legge_oggetto_corpo_e_mittente() -> None:
     assert email.subject == "Richiesta prenotazione televisita"
     assert "prenotare una televisita" in email.body_text
     assert email.sender == "paziente@example.com"
-    assert email.internet_message_id == "<msg-1@example.com>"
-    assert email.key == "<msg-1@example.com>"
+    assert email.internet_message_id.startswith("<msg-")
+    assert email.key == email.internet_message_id
 
 
 def test_corpo_html_ridotto_a_testo() -> None:

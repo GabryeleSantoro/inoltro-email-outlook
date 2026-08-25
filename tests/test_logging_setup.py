@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -112,3 +115,63 @@ def test_setup_logging_pulisce_i_vecchi(tmp_path: Path) -> None:
         "servizio-20250102-000000.log",
         "servizio-20250521-091500.log",
     ]
+
+
+def test_worker_reload_riusa_il_file_della_sessione(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Il processo figlio di Uvicorn non deve creare un log distinto."""
+    from inoltro_email.api import server
+
+    visto = {}
+    session_file = tmp_path / "servizio-20250521-091500.log"
+    monkeypatch.setenv("INOLTRO_EMAIL_SESSION_LOG_FILE", str(session_file))
+    monkeypatch.setenv("INOLTRO_EMAIL_SESSION_LOG_LEVEL", "warning")
+    monkeypatch.setattr(
+        server,
+        "setup_logging",
+        lambda level, path, *, per_session: visto.update(
+            level=level, path=path, per_session=per_session
+        ),
+    )
+
+    server._configure_reload_worker_logging()
+
+    assert visto == {"level": "warning", "path": session_file, "per_session": False}
+
+
+def test_reload_passa_il_log_di_sessione_al_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La configurazione Uvicorn non deve sostituire l'handler del file."""
+    from inoltro_email.api import server
+    from inoltro_email.config import Settings
+
+    chiamate = []
+    finto_uvicorn = SimpleNamespace(
+        run=lambda *args, **kwargs: chiamate.append((args, kwargs))
+    )
+    monkeypatch.setitem(sys.modules, "uvicorn", finto_uvicorn)
+    session_file = tmp_path / "servizio-20250521-091500.log"
+
+    server.run(
+        Settings(),
+        reload=True,
+        session_log_file=session_file,
+        log_level="WARNING",
+    )
+
+    assert chiamate == [
+        (
+            ("inoltro_email.api.server:build",),
+            {
+                "factory": True,
+                "host": "0.0.0.0",
+                "port": 8000,
+                "reload": True,
+                "log_config": None,
+            },
+        )
+    ]
+    assert os.environ["INOLTRO_EMAIL_SESSION_LOG_FILE"] == str(session_file.resolve())
+    assert os.environ["INOLTRO_EMAIL_SESSION_LOG_LEVEL"] == "WARNING"

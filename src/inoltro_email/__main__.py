@@ -87,7 +87,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.port:
             settings.api.port = args.port
         flow_path = args.flow_path
-        flow_timer = args.flow_timer or 60
+        flow_timer = args.flow_timer if args.flow_timer is not None else 60
+        if flow_timer <= 0:
+            parser.error("--flow-timer deve essere maggiore di zero")
 
     settings.ensure_directories()
     started_at = datetime.now()
@@ -104,24 +106,59 @@ def main(argv: Optional[List[str]] = None) -> int:
     if log_file:
         logger.info("Log di questa sessione: %s", log_file)
 
+    exit_code = 1
     try:
         if args.command == "serve":
-            return _cmd_serve(settings, reload=args.reload, flow_path=flow_path, flow_timer=flow_timer)
-        if args.command == "analizza":
-            return _cmd_analizza(settings, args.path)
-        return _cmd_check_file(settings, args.path, args.show_text)
+            exit_code = _cmd_serve(
+                settings,
+                reload=args.reload,
+                flow_path=flow_path,
+                flow_timer=flow_timer,
+                session_log_file=log_file,
+                log_level=args.log_level or settings.logging.level,
+            )
+        elif args.command == "analizza":
+            exit_code = _cmd_analizza(settings, args.path)
+        else:
+            exit_code = _cmd_check_file(settings, args.path, args.show_text)
     except KeyboardInterrupt:
         logger.info("Interrotto dall'utente.")
-        return 130
+        exit_code = 130
+    finally:
+        finished_at = datetime.now()
+        duration = (finished_at - started_at).total_seconds()
+        logger.info(
+            "Sessione '%s' terminata il %s: codice=%d, durata=%.1f s.",
+            args.command,
+            finished_at.strftime("%d/%m/%Y alle %H:%M:%S"),
+            exit_code,
+            duration,
+        )
+    return exit_code
 
 
 # ------------------------------------------------------------------ comandi
 
 
-def _cmd_serve(settings: Settings, *, reload: bool = False, flow_path: Optional[Path] = None, flow_timer: int = 60) -> int:
+def _cmd_serve(
+    settings: Settings,
+    *,
+    reload: bool = False,
+    flow_path: Optional[Path] = None,
+    flow_timer: int = 60,
+    session_log_file: Optional[Path] = None,
+    log_level: Optional[str] = None,
+) -> int:
     from .api.server import run
 
-    run(settings, reload=reload, flow_path=flow_path, flow_timer=flow_timer)
+    run(
+        settings,
+        reload=reload,
+        flow_path=flow_path,
+        flow_timer=flow_timer,
+        session_log_file=session_log_file,
+        log_level=log_level,
+    )
     return 0
 
 

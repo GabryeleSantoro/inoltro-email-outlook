@@ -79,6 +79,19 @@
       "source_location": "L30"
     },
     {
+      "id": "tests_conftest_fakeocrclient",
+      "label": "FakeOcrClient",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": "fakeocrclient",
+      "source_file": "tests/conftest.py",
+      "source_location": "L49"
+    },
+    {
       "id": "src_inoltro_email_models_attachmentfile",
       "label": "AttachmentFile",
       "_callable": true,
@@ -116,6 +129,19 @@
       "norm_label": "ocrresult",
       "source_file": "src/inoltro_email/models.py",
       "source_location": "L134"
+    },
+    {
+      "id": "src_inoltro_email_models_textsource",
+      "label": "TextSource",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "textsource",
+      "source_file": "src/inoltro_email/models.py",
+      "source_location": "L20"
     },
     {
       "id": "src_inoltro_email_ocr_extractor_textextractor",
@@ -183,30 +209,17 @@
       "source_location": "L24"
     },
     {
-      "id": "src_inoltro_email_models_textsource",
-      "label": "TextSource",
+      "id": "src_inoltro_email_rawjson_tolerantparser",
+      "label": "_TolerantParser",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "textsource",
-      "source_file": "src/inoltro_email/models.py",
-      "source_location": "L20"
-    },
-    {
-      "id": "tests_conftest_fakeocrclient",
-      "label": "FakeOcrClient",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "fakeocrclient",
-      "source_file": "tests/conftest.py",
-      "source_location": "L49"
+      "norm_label": "_tolerantparser",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L101"
     },
     {
       "id": "src_inoltro_email_inbound_bodyparser",
@@ -267,7 +280,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "localmessagestore",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -280,7 +293,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "messagedateerror",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -467,19 +480,6 @@
       "norm_label": "rawjsonerror",
       "source_file": "src/inoltro_email/rawjson.py",
       "source_location": "L52"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser",
-      "label": "_TolerantParser",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "_tolerantparser",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L101"
     },
     {
       "id": "src_inoltro_email_config_localfilesettings",
@@ -674,6 +674,18 @@
       "source_location": "L82"
     },
     {
+      "id": "tests_conftest_b64",
+      "label": "b64()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": "b64()",
+      "source_file": "tests/conftest.py",
+      "source_location": "L78"
+    },
+    {
       "id": "tests_conftest_email_payload",
       "label": "email_payload()",
       "_callable": true,
@@ -684,6 +696,30 @@
       "norm_label": "email_payload()",
       "source_file": "tests/conftest.py",
       "source_location": "L99"
+    },
+    {
+      "id": "tests_conftest_fake_ocr",
+      "label": "fake_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": "fake_ocr()",
+      "source_file": "tests/conftest.py",
+      "source_location": "L71"
+    },
+    {
+      "id": "tests_conftest_fakeocrclient_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "tests/conftest.py",
+      "source_location": "L52"
     },
     {
       "id": "tests_conftest_make_blank_pdf",
@@ -1694,6 +1730,210 @@
       "source_location": "L158"
     },
     {
+      "id": "tests_conftest_fakeocrclient_parse_file",
+      "label": ".parse_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": ".parse_file()",
+      "source_file": "tests/conftest.py",
+      "source_location": "L60"
+    },
+    {
+      "id": "tests_conftest_make_pdf",
+      "label": "make_pdf()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "make_pdf()",
+      "source_file": "tests/conftest.py",
+      "source_location": "L125"
+    },
+    {
+      "id": "tests_test_extractor_attachment_from",
+      "label": "attachment_from()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "attachment_from()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L15"
+    },
+    {
+      "id": "tests_test_extractor_test_allegato_troppo_grande_saltato",
+      "label": "test_allegato_troppo_grande_saltato()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_allegato_troppo_grande_saltato()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L121"
+    },
+    {
+      "id": "tests_test_extractor_test_errore_ocr_non_solleva_ma_viene_registrato",
+      "label": "test_errore_ocr_non_solleva_ma_viene_registrato()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_errore_ocr_non_solleva_ma_viene_registrato()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L185"
+    },
+    {
+      "id": "tests_test_extractor_test_estensione_non_ammessa_saltata",
+      "label": "test_estensione_non_ammessa_saltata()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_estensione_non_ammessa_saltata()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L109"
+    },
+    {
+      "id": "tests_test_extractor_test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato",
+      "label": "test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L154"
+    },
+    {
+      "id": "tests_test_extractor_test_immagine_illeggibile_viene_saltata",
+      "label": "test_immagine_illeggibile_viene_saltata()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_immagine_illeggibile_viene_saltata()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L170"
+    },
+    {
+      "id": "tests_test_extractor_test_immagine_inviata_direttamente",
+      "label": "test_immagine_inviata_direttamente()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_immagine_inviata_direttamente()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L98"
+    },
+    {
+      "id": "tests_test_extractor_test_immagine_oltre_il_limite_viene_ridimensionata",
+      "label": "test_immagine_oltre_il_limite_viene_ridimensionata()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_immagine_oltre_il_limite_viene_ridimensionata()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L132"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_con_poco_testo_ricade_sull_ocr",
+      "label": "test_pdf_con_poco_testo_ricade_sull_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_con_poco_testo_ricade_sull_ocr()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L32"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_con_testo_insufficiente_ricade_su_ocr",
+      "label": "test_pdf_con_testo_insufficiente_ricade_su_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_con_testo_insufficiente_ricade_su_ocr()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L200"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_con_testo_letto_senza_ocr",
+      "label": "test_pdf_con_testo_letto_senza_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_con_testo_letto_senza_ocr()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L19"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_con_testo_unito_all_ocr_quando_richiesto",
+      "label": "test_pdf_con_testo_unito_all_ocr_quando_richiesto()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_con_testo_unito_all_ocr_quando_richiesto()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L56"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_illeggibile_va_all_ocr",
+      "label": "test_pdf_illeggibile_va_all_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_illeggibile_va_all_ocr()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L44"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_lungo_viene_spezzato_in_blocchi",
+      "label": "test_pdf_lungo_viene_spezzato_in_blocchi()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_lungo_viene_spezzato_in_blocchi()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L84"
+    },
+    {
+      "id": "tests_test_extractor_test_pdf_scansionato_passa_dall_ocr",
+      "label": "test_pdf_scansionato_passa_dall_ocr()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_pdf_scansionato_passa_dall_ocr()",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L72"
+    },
+    {
       "id": "src_inoltro_email_main_build_parser",
       "label": "build_parser()",
       "_callable": true,
@@ -2555,19 +2795,7 @@
       "file_type": "code",
       "norm_label": "_configure_reload_worker_logging()",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L27"
-    },
-    {
-      "id": "src_inoltro_email_api_server_run",
-      "label": "run()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 16,
-      "community_name": "setup_logging",
-      "file_type": "code",
-      "norm_label": "run()",
-      "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L52"
+      "source_location": "L28"
     },
     {
       "id": "src_inoltro_email_logging_setup_prune_session_logs",
@@ -2615,7 +2843,7 @@
       "file_type": "code",
       "norm_label": "_ripristina_logger()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L18"
+      "source_location": "L15"
     },
     {
       "id": "tests_test_logging_setup_test_nome_con_data_e_ora",
@@ -2627,7 +2855,7 @@
       "file_type": "code",
       "norm_label": "test_nome_con_data_e_ora()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L27"
+      "source_location": "L24"
     },
     {
       "id": "tests_test_logging_setup_test_nome_progressivo_se_il_file_esiste",
@@ -2639,7 +2867,7 @@
       "file_type": "code",
       "norm_label": "test_nome_progressivo_se_il_file_esiste()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L32"
+      "source_location": "L29"
     },
     {
       "id": "tests_test_logging_setup_test_ogni_sessione_scrive_sul_proprio_file",
@@ -2651,7 +2879,7 @@
       "file_type": "code",
       "norm_label": "test_ogni_sessione_scrive_sul_proprio_file()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L40"
+      "source_location": "L37"
     },
     {
       "id": "tests_test_logging_setup_test_per_session_disattivato_usa_un_unico_file",
@@ -2663,7 +2891,7 @@
       "file_type": "code",
       "norm_label": "test_per_session_disattivato_usa_un_unico_file()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L56"
+      "source_location": "L53"
     },
     {
       "id": "tests_test_logging_setup_test_pulizia_conserva_i_piu_recenti",
@@ -2675,7 +2903,7 @@
       "file_type": "code",
       "norm_label": "test_pulizia_conserva_i_piu_recenti()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L69"
+      "source_location": "L66"
     },
     {
       "id": "tests_test_logging_setup_test_pulizia_non_tocca_altri_file",
@@ -2687,19 +2915,7 @@
       "file_type": "code",
       "norm_label": "test_pulizia_non_tocca_altri_file()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L87"
-    },
-    {
-      "id": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "label": "test_reload_passa_il_log_di_sessione_al_worker()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 16,
-      "community_name": "setup_logging",
-      "file_type": "code",
-      "norm_label": "test_reload_passa_il_log_di_sessione_al_worker()",
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L143"
+      "source_location": "L84"
     },
     {
       "id": "tests_test_logging_setup_test_senza_file_solo_console",
@@ -2711,7 +2927,7 @@
       "file_type": "code",
       "norm_label": "test_senza_file_solo_console()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L64"
+      "source_location": "L61"
     },
     {
       "id": "tests_test_logging_setup_test_setup_logging_pulisce_i_vecchi",
@@ -2723,7 +2939,7 @@
       "file_type": "code",
       "norm_label": "test_setup_logging_pulisce_i_vecchi()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L105"
+      "source_location": "L102"
     },
     {
       "id": "tests_test_logging_setup_test_worker_reload_riusa_il_file_della_sessione",
@@ -2735,235 +2951,187 @@
       "file_type": "code",
       "norm_label": "test_worker_reload_riusa_il_file_della_sessione()",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L120"
+      "source_location": "L117"
     },
     {
-      "id": "tests_conftest_fake_ocr",
-      "label": "fake_ocr()",
+      "id": "src_inoltro_email_rawjson_as_list",
+      "label": "_as_list()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "fake_ocr()",
-      "source_file": "tests/conftest.py",
-      "source_location": "L71"
+      "norm_label": "_as_list()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L335"
     },
     {
-      "id": "tests_conftest_fakeocrclient_init",
+      "id": "src_inoltro_email_rawjson_tolerantparser_closes_string",
+      "label": "._closes_string()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "code",
+      "norm_label": "._closes_string()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L276"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_tolerantparser_init",
       "label": ".__init__()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
       "norm_label": ".__init__()",
-      "source_file": "tests/conftest.py",
-      "source_location": "L52"
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L111"
     },
     {
-      "id": "tests_conftest_fakeocrclient_parse_file",
-      "label": ".parse_file()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_next_significant",
+      "label": "._next_significant()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": ".parse_file()",
-      "source_file": "tests/conftest.py",
-      "source_location": "L60"
+      "norm_label": "._next_significant()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L322"
     },
     {
-      "id": "tests_conftest_make_pdf",
-      "label": "make_pdf()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_note",
+      "label": "._note()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "make_pdf()",
-      "source_file": "tests/conftest.py",
-      "source_location": "L125"
+      "norm_label": "._note()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L331"
     },
     {
-      "id": "tests_test_extractor_attachment_from",
-      "label": "attachment_from()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse",
+      "label": ".parse()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "attachment_from()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L15"
+      "norm_label": ".parse()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L128"
     },
     {
-      "id": "tests_test_extractor_test_allegato_troppo_grande_saltato",
-      "label": "test_allegato_troppo_grande_saltato()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_array",
+      "label": "._parse_array()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_allegato_troppo_grande_saltato()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L121"
+      "norm_label": "._parse_array()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L187"
     },
     {
-      "id": "tests_test_extractor_test_errore_ocr_non_solleva_ma_viene_registrato",
-      "label": "test_errore_ocr_non_solleva_ma_viene_registrato()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_key",
+      "label": "._parse_key()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_errore_ocr_non_solleva_ma_viene_registrato()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L185"
+      "norm_label": "._parse_key()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L205"
     },
     {
-      "id": "tests_test_extractor_test_estensione_non_ammessa_saltata",
-      "label": "test_estensione_non_ammessa_saltata()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_literal",
+      "label": "._parse_literal()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_estensione_non_ammessa_saltata()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L109"
+      "norm_label": "._parse_literal()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L226"
     },
     {
-      "id": "tests_test_extractor_test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato",
-      "label": "test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_object",
+      "label": "._parse_object()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L154"
+      "norm_label": "._parse_object()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L149"
     },
     {
-      "id": "tests_test_extractor_test_immagine_illeggibile_viene_saltata",
-      "label": "test_immagine_illeggibile_viene_saltata()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_string",
+      "label": "._parse_string()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_immagine_illeggibile_viene_saltata()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L170"
+      "norm_label": "._parse_string()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L243"
     },
     {
-      "id": "tests_test_extractor_test_immagine_inviata_direttamente",
-      "label": "test_immagine_inviata_direttamente()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_parse_value",
+      "label": "._parse_value()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_immagine_inviata_direttamente()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L98"
+      "norm_label": "._parse_value()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L138"
     },
     {
-      "id": "tests_test_extractor_test_immagine_oltre_il_limite_viene_ridimensionata",
-      "label": "test_immagine_oltre_il_limite_viene_ridimensionata()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_peek",
+      "label": "._peek()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_immagine_oltre_il_limite_viene_ridimensionata()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L132"
+      "norm_label": "._peek()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L314"
     },
     {
-      "id": "tests_test_extractor_test_pdf_con_poco_testo_ricade_sull_ocr",
-      "label": "test_pdf_con_poco_testo_ricade_sull_ocr()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_read_escape",
+      "label": "._read_escape()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_pdf_con_poco_testo_ricade_sull_ocr()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L32"
+      "norm_label": "._read_escape()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L294"
     },
     {
-      "id": "tests_test_extractor_test_pdf_con_testo_insufficiente_ricade_su_ocr",
-      "label": "test_pdf_con_testo_insufficiente_ricade_su_ocr()",
+      "id": "src_inoltro_email_rawjson_tolerantparser_skip_whitespace",
+      "label": "._skip_whitespace()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "FakeOcrClient",
+      "community_name": "_TolerantParser",
       "file_type": "code",
-      "norm_label": "test_pdf_con_testo_insufficiente_ricade_su_ocr()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L200"
-    },
-    {
-      "id": "tests_test_extractor_test_pdf_con_testo_letto_senza_ocr",
-      "label": "test_pdf_con_testo_letto_senza_ocr()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_pdf_con_testo_letto_senza_ocr()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L19"
-    },
-    {
-      "id": "tests_test_extractor_test_pdf_con_testo_unito_all_ocr_quando_richiesto",
-      "label": "test_pdf_con_testo_unito_all_ocr_quando_richiesto()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_pdf_con_testo_unito_all_ocr_quando_richiesto()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L56"
-    },
-    {
-      "id": "tests_test_extractor_test_pdf_illeggibile_va_all_ocr",
-      "label": "test_pdf_illeggibile_va_all_ocr()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_pdf_illeggibile_va_all_ocr()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L44"
-    },
-    {
-      "id": "tests_test_extractor_test_pdf_lungo_viene_spezzato_in_blocchi",
-      "label": "test_pdf_lungo_viene_spezzato_in_blocchi()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_pdf_lungo_viene_spezzato_in_blocchi()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L84"
-    },
-    {
-      "id": "tests_test_extractor_test_pdf_scansionato_passa_dall_ocr",
-      "label": "test_pdf_scansionato_passa_dall_ocr()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_pdf_scansionato_passa_dall_ocr()",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L72"
+      "norm_label": "._skip_whitespace()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L318"
     },
     {
       "id": "src_inoltro_email_inbound_inside_any",
@@ -3084,6 +3252,30 @@
       "norm_label": ".__init__()",
       "source_file": "src/inoltro_email/inbound.py",
       "source_location": "L551"
+    },
+    {
+      "id": "src_inoltro_email_confidence_readable",
+      "label": "_readable()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "matching.py",
+      "file_type": "code",
+      "norm_label": "_readable()",
+      "source_file": "src/inoltro_email/confidence.py",
+      "source_location": "L434"
+    },
+    {
+      "id": "src_inoltro_email_confidence_zones_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "matching.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "src/inoltro_email/confidence.py",
+      "source_location": "L383"
     },
     {
       "id": "src_inoltro_email_matching_alnum_collapse",
@@ -3362,6 +3554,18 @@
       "source_location": "L494"
     },
     {
+      "id": "tests_test_inbound_test_base64_tollerante_a_spazi_e_padding",
+      "label": "test_base64_tollerante_a_spazi_e_padding()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "InboundError",
+      "file_type": "code",
+      "norm_label": "test_base64_tollerante_a_spazi_e_padding()",
+      "source_file": "tests/test_inbound.py",
+      "source_location": "L156"
+    },
+    {
       "id": "tests_test_inbound_test_email_vuota_rifiutata",
       "label": "test_email_vuota_rifiutata()",
       "_callable": true,
@@ -3386,84 +3590,12 @@
       "source_location": "L146"
     },
     {
-      "id": "src_inoltro_email_api_app_check_api_key",
-      "label": "_check_api_key()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_check_api_key()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L374"
-    },
-    {
-      "id": "src_inoltro_email_api_app_constant_time_equals",
-      "label": "_constant_time_equals()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_constant_time_equals()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L386"
-    },
-    {
-      "id": "src_inoltro_email_api_app_ignored_message",
-      "label": "_ignored_message()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_ignored_message()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L405"
-    },
-    {
-      "id": "src_inoltro_email_api_app_payload_to_log",
-      "label": "_payload_to_log()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_payload_to_log()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L90"
-    },
-    {
-      "id": "src_inoltro_email_api_app_payload_value",
-      "label": "_payload_value()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_payload_value()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L391"
-    },
-    {
-      "id": "src_inoltro_email_api_app_read_json",
-      "label": "_read_json()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "_read_json()",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L417"
-    },
-    {
       "id": "src_inoltro_email_message_guard_localmessagestore_claim",
       "label": ".claim()",
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": ".claim()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3475,7 +3607,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "._connect()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3487,7 +3619,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3499,7 +3631,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": ".is_fresh()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3511,7 +3643,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": ".release()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3523,7 +3655,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "message_fingerprint()",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -3535,11 +3667,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "parse_message_date()",
       "source_file": "src/inoltro_email/message_guard.py",
       "source_location": "L91"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_tolerantparser_repairs",
+      "label": ".repairs()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 22,
+      "community_name": ".repairs",
+      "file_type": "code",
+      "norm_label": ".repairs()",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L121"
     },
     {
       "id": "tests_test_inbound_test_allegati_decodificati",
@@ -3674,6 +3818,78 @@
       "source_location": "L162"
     },
     {
+      "id": "src_inoltro_email_api_app_check_api_key",
+      "label": "_check_api_key()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_check_api_key()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L374"
+    },
+    {
+      "id": "src_inoltro_email_api_app_constant_time_equals",
+      "label": "_constant_time_equals()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_constant_time_equals()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L386"
+    },
+    {
+      "id": "src_inoltro_email_api_app_ignored_message",
+      "label": "_ignored_message()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_ignored_message()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L405"
+    },
+    {
+      "id": "src_inoltro_email_api_app_payload_to_log",
+      "label": "_payload_to_log()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_payload_to_log()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L90"
+    },
+    {
+      "id": "src_inoltro_email_api_app_payload_value",
+      "label": "_payload_value()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_payload_value()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L391"
+    },
+    {
+      "id": "src_inoltro_email_api_app_read_json",
+      "label": "_read_json()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "_read_json()",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L417"
+    },
+    {
       "id": "opencode_plugins_graphify_graphifyplugin",
       "label": "GraphifyPlugin()",
       "_callable": true,
@@ -3794,18 +4010,6 @@
       "source_location": "L472"
     },
     {
-      "id": "src_inoltro_email_confidence_readable",
-      "label": "_readable()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ConfidenceSettings",
-      "file_type": "code",
-      "norm_label": "_readable()",
-      "source_file": "src/inoltro_email/confidence.py",
-      "source_location": "L434"
-    },
-    {
       "id": "src_inoltro_email_confidence_score_booking",
       "label": "score_booking()",
       "_callable": true,
@@ -3888,18 +4092,6 @@
       "norm_label": "._forma_scorretta()",
       "source_file": "src/inoltro_email/confidence.py",
       "source_location": "L423"
-    },
-    {
-      "id": "src_inoltro_email_confidence_zones_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ConfidenceSettings",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "src/inoltro_email/confidence.py",
-      "source_location": "L383"
     },
     {
       "id": "src_inoltro_email_models_confidencescore_negatives",
@@ -4176,6 +4368,18 @@
       "norm_label": "main()",
       "source_file": "src/inoltro_email/inspect_popup.py",
       "source_location": "L46"
+    },
+    {
+      "id": "src_inoltro_email_api_server_run",
+      "label": "run()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "config.py",
+      "file_type": "code",
+      "norm_label": "run()",
+      "source_file": "src/inoltro_email/api/server.py",
+      "source_location": "L52"
     },
     {
       "id": "src_inoltro_email_config_as_str_list",
@@ -4550,18 +4754,6 @@
       "source_location": "L44"
     },
     {
-      "id": "src_inoltro_email_rawjson_as_list",
-      "label": "_as_list()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "_as_list()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L335"
-    },
-    {
       "id": "src_inoltro_email_rawjson_as_text",
       "label": "_as_text()",
       "_callable": true,
@@ -4596,186 +4788,6 @@
       "norm_label": "loads_tolerant()",
       "source_file": "src/inoltro_email/rawjson.py",
       "source_location": "L56"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_closes_string",
-      "label": "._closes_string()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._closes_string()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L276"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L111"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_next_significant",
-      "label": "._next_significant()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._next_significant()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L322"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_note",
-      "label": "._note()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._note()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L331"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse",
-      "label": ".parse()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": ".parse()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L128"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_array",
-      "label": "._parse_array()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_array()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L187"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_key",
-      "label": "._parse_key()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_key()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L205"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_literal",
-      "label": "._parse_literal()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_literal()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L226"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_object",
-      "label": "._parse_object()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_object()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L149"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_string",
-      "label": "._parse_string()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_string()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L243"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_parse_value",
-      "label": "._parse_value()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._parse_value()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L138"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_peek",
-      "label": "._peek()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._peek()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L314"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_read_escape",
-      "label": "._read_escape()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._read_escape()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L294"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_repairs",
-      "label": ".repairs()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": ".repairs()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L121"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_tolerantparser_skip_whitespace",
-      "label": "._skip_whitespace()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "._skip_whitespace()",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L318"
     },
     {
       "id": "tests_test_rawjson_test_a_capo_dentro_il_corpo",
@@ -4910,18 +4922,6 @@
       "source_location": "L83"
     },
     {
-      "id": "tests_conftest_b64",
-      "label": "b64()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 6,
-      "community_name": "parse_email",
-      "file_type": "code",
-      "norm_label": "b64()",
-      "source_file": "tests/conftest.py",
-      "source_location": "L78"
-    },
-    {
       "id": "tests_test_inbound_test_allegato_con_base64_rotto_ignorato_senza_bloccare_gli_altri",
       "label": "test_allegato_con_base64_rotto_ignorato_senza_bloccare_gli_altri()",
       "_callable": true,
@@ -4968,18 +4968,6 @@
       "norm_label": "test_allegato_senza_estensione_prende_quella_del_mime()",
       "source_file": "tests/test_inbound.py",
       "source_location": "L129"
-    },
-    {
-      "id": "tests_test_inbound_test_base64_tollerante_a_spazi_e_padding",
-      "label": "test_base64_tollerante_a_spazi_e_padding()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 6,
-      "community_name": "parse_email",
-      "file_type": "code",
-      "norm_label": "test_base64_tollerante_a_spazi_e_padding()",
-      "source_file": "tests/test_inbound.py",
-      "source_location": "L156"
     },
     {
       "id": "tests_test_inbound_test_campo_date_usato_come_data_di_ricezione",
@@ -6036,6 +6024,17 @@
       "source_location": ""
     },
     {
+      "id": "tests_conftest",
+      "label": "conftest.py",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "code",
+      "norm_label": "conftest.py",
+      "source_file": "tests/conftest.py",
+      "source_location": "L1"
+    },
+    {
       "id": "tests_conftest_py_any",
       "label": "Any",
       "_origin": "ast",
@@ -6124,6 +6123,17 @@
       "source_location": "L31"
     },
     {
+      "id": "tests_conftest_rationale_1",
+      "label": "Fixture condivise: configurazione di prova, OCR fittizio, payload di esempio.",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "rationale",
+      "norm_label": "fixture condivise: configurazione di prova, ocr fittizio, payload di esempio.",
+      "source_file": "tests/conftest.py",
+      "source_location": "L1"
+    },
+    {
       "id": "tests_conftest_rationale_105",
       "label": "Payload come quello inviato dall'azione HTTP di Power Automate.",
       "_origin": "ast",
@@ -6144,6 +6154,17 @@
       "norm_label": "pdf senza alcun testo: simula una scansione da mandare all'ocr.",
       "source_file": "tests/conftest.py",
       "source_location": "L176"
+    },
+    {
+      "id": "tests_conftest_rationale_50",
+      "label": "Restituisce testi predefiniti per nome file e conta le chiamate.",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "Settings",
+      "file_type": "rationale",
+      "norm_label": "restituisce testi predefiniti per nome file e conta le chiamate.",
+      "source_file": "tests/conftest.py",
+      "source_location": "L50"
     },
     {
       "id": "tests_conftest_rationale_89",
@@ -6542,6 +6563,39 @@
       "source_location": ""
     },
     {
+      "id": "tests_conftest_py_path",
+      "label": "Path",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "path",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "tests_test_extractor",
+      "label": "test_extractor.py",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "test_extractor.py",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "tests_test_extractor_py_path",
+      "label": "Path",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "code",
+      "norm_label": "path",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "main_rationale_1",
       "label": "Avvio rapido del servizio: ``python main.py``. Equivalente a ``python -m\u2026",
       "_origin": "ast",
@@ -6617,6 +6671,17 @@
       "norm_label": "testo ricavato da un allegato, con la provenienza e l'eventuale errore.",
       "source_file": "src/inoltro_email/models.py",
       "source_location": "L144"
+    },
+    {
+      "id": "src_inoltro_email_models_rationale_21",
+      "label": "Da dove arriva il testo di un allegato.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "da dove arriva il testo di un allegato.",
+      "source_file": "src/inoltro_email/models.py",
+      "source_location": "L21"
     },
     {
       "id": "src_inoltro_email_ocr_extractor_rationale_1",
@@ -6727,6 +6792,105 @@
       "norm_label": "manda un file a ocr.space e restituisce il testo riconosciuto. sollevare...",
       "source_file": "src/inoltro_email/ocr/ocrspace.py",
       "source_location": "L66"
+    },
+    {
+      "id": "tests_conftest_rationale_126",
+      "label": "PDF con un vero livello di testo, una pagina per elemento.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "pdf con un vero livello di testo, una pagina per elemento.",
+      "source_file": "tests/conftest.py",
+      "source_location": "L126"
+    },
+    {
+      "id": "tests_test_extractor_rationale_1",
+      "label": "Test della scelta della strategia di lettura degli allegati.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "test della scelta della strategia di lettura degli allegati.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "tests_test_extractor_rationale_135",
+      "label": "Una foto di impegnativa supera sempre il MB: si riduce, non si salta.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "una foto di impegnativa supera sempre il mb: si riduce, non si salta.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L135"
+    },
+    {
+      "id": "tests_test_extractor_rationale_171",
+      "label": "Byte che non sono un'immagine: si salta con il motivo, senza sollevare.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "byte che non sono un'immagine: si salta con il motivo, senza sollevare.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L171"
+    },
+    {
+      "id": "tests_test_extractor_rationale_20",
+      "label": "Prima si prova a leggere il PDF: se il testo c'e', non si chiama l'OCR.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "prima si prova a leggere il pdf: se il testo c'e', non si chiama l'ocr.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L20"
+    },
+    {
+      "id": "tests_test_extractor_rationale_201",
+      "label": "Poche lettere nel livello di testo = PDF scansionato con intestazione.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "poche lettere nel livello di testo = pdf scansionato con intestazione.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L201"
+    },
+    {
+      "id": "tests_test_extractor_rationale_33",
+      "label": "Poche lettere sono il tipico PDF scansionato con la sola intestazione.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "poche lettere sono il tipico pdf scansionato con la sola intestazione.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L33"
+    },
+    {
+      "id": "tests_test_extractor_rationale_45",
+      "label": "PDF malformato: pypdf non ne cava nulla, ci prova l'OCR.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "pdf malformato: pypdf non ne cava nulla, ci prova l'ocr.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L45"
+    },
+    {
+      "id": "tests_test_extractor_rationale_85",
+      "label": "Oltre il limite di pagine del piano, il PDF va inviato a pezzi.",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "TextExtractor",
+      "file_type": "rationale",
+      "norm_label": "oltre il limite di pagine del piano, il pdf va inviato a pezzi.",
+      "source_file": "tests/test_extractor.py",
+      "source_location": "L85"
     },
     {
       "id": "argumentparser",
@@ -7488,7 +7652,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_inoltro_email_api_server_rationale_28",
+      "id": "src_inoltro_email_api_server_rationale_29",
       "label": "Fa scrivere il worker ricaricato nello stesso log della sessione CLI.",
       "_origin": "ast",
       "community": 16,
@@ -7496,7 +7660,7 @@
       "file_type": "rationale",
       "norm_label": "fa scrivere il worker ricaricato nello stesso log della sessione cli.",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L28"
+      "source_location": "L29"
     },
     {
       "id": "src_inoltro_email_api_server_rationale_42",
@@ -7508,17 +7672,6 @@
       "norm_label": "fabbrica per ``uvicorn --factory``: legge la configurazione da sola.",
       "source_file": "src/inoltro_email/api/server.py",
       "source_location": "L42"
-    },
-    {
-      "id": "src_inoltro_email_api_server_rationale_61",
-      "label": "Avvia il server HTTP (bloccante) fino a Ctrl+C.",
-      "_origin": "ast",
-      "community": 16,
-      "community_name": "setup_logging",
-      "file_type": "rationale",
-      "norm_label": "avvia il server http (bloccante) fino a ctrl+c.",
-      "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L61"
     },
     {
       "id": "src_inoltro_email_logging_setup_rationale_1",
@@ -7576,7 +7729,7 @@
       "source_location": "L1"
     },
     {
-      "id": "tests_test_logging_setup_rationale_106",
+      "id": "tests_test_logging_setup_rationale_103",
       "label": "Il file della sessione in corso rientra sempre fra quelli conservati.",
       "_origin": "ast",
       "community": 16,
@@ -7584,10 +7737,10 @@
       "file_type": "rationale",
       "norm_label": "il file della sessione in corso rientra sempre fra quelli conservati.",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L106"
+      "source_location": "L103"
     },
     {
-      "id": "tests_test_logging_setup_rationale_123",
+      "id": "tests_test_logging_setup_rationale_120",
       "label": "Il processo figlio di Uvicorn non deve creare un log distinto.",
       "_origin": "ast",
       "community": 16,
@@ -7595,21 +7748,10 @@
       "file_type": "rationale",
       "norm_label": "il processo figlio di uvicorn non deve creare un log distinto.",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L123"
+      "source_location": "L120"
     },
     {
-      "id": "tests_test_logging_setup_rationale_146",
-      "label": "La configurazione Uvicorn non deve sostituire l'handler del file.",
-      "_origin": "ast",
-      "community": 16,
-      "community_name": "setup_logging",
-      "file_type": "rationale",
-      "norm_label": "la configurazione uvicorn non deve sostituire l'handler del file.",
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L146"
-    },
-    {
-      "id": "tests_test_logging_setup_rationale_19",
+      "id": "tests_test_logging_setup_rationale_16",
       "label": "Gli handler installati dai test non devono restare al logger radice.",
       "_origin": "ast",
       "community": 16,
@@ -7617,10 +7759,10 @@
       "file_type": "rationale",
       "norm_label": "gli handler installati dai test non devono restare al logger radice.",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L19"
+      "source_location": "L16"
     },
     {
-      "id": "tests_test_logging_setup_rationale_33",
+      "id": "tests_test_logging_setup_rationale_30",
       "label": "Due sessioni nello stesso secondo non condividono il file.",
       "_origin": "ast",
       "community": 16,
@@ -7628,10 +7770,10 @@
       "file_type": "rationale",
       "norm_label": "due sessioni nello stesso secondo non condividono il file.",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L33"
+      "source_location": "L30"
     },
     {
-      "id": "tests_test_logging_setup_rationale_88",
+      "id": "tests_test_logging_setup_rationale_85",
       "label": "Solo i file col nostro schema di data/ora vengono cancellati.",
       "_origin": "ast",
       "community": 16,
@@ -7639,183 +7781,84 @@
       "file_type": "rationale",
       "norm_label": "solo i file col nostro schema di data/ora vengono cancellati.",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L88"
-    },
-    {
-      "id": "tests_conftest",
-      "label": "conftest.py",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "conftest.py",
-      "source_file": "tests/conftest.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "tests_conftest_py_path",
-      "label": "Path",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "path",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "tests_test_extractor",
-      "label": "test_extractor.py",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "test_extractor.py",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "tests_test_extractor_py_path",
-      "label": "Path",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "code",
-      "norm_label": "path",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_inoltro_email_models_rationale_21",
-      "label": "Da dove arriva il testo di un allegato.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "da dove arriva il testo di un allegato.",
-      "source_file": "src/inoltro_email/models.py",
-      "source_location": "L21"
-    },
-    {
-      "id": "tests_conftest_rationale_1",
-      "label": "Fixture condivise: configurazione di prova, OCR fittizio, payload di esempio.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "fixture condivise: configurazione di prova, ocr fittizio, payload di esempio.",
-      "source_file": "tests/conftest.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "tests_conftest_rationale_126",
-      "label": "PDF con un vero livello di testo, una pagina per elemento.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "pdf con un vero livello di testo, una pagina per elemento.",
-      "source_file": "tests/conftest.py",
-      "source_location": "L126"
-    },
-    {
-      "id": "tests_conftest_rationale_50",
-      "label": "Restituisce testi predefiniti per nome file e conta le chiamate.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "restituisce testi predefiniti per nome file e conta le chiamate.",
-      "source_file": "tests/conftest.py",
-      "source_location": "L50"
-    },
-    {
-      "id": "tests_test_extractor_rationale_1",
-      "label": "Test della scelta della strategia di lettura degli allegati.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "test della scelta della strategia di lettura degli allegati.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "tests_test_extractor_rationale_135",
-      "label": "Una foto di impegnativa supera sempre il MB: si riduce, non si salta.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "una foto di impegnativa supera sempre il mb: si riduce, non si salta.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L135"
-    },
-    {
-      "id": "tests_test_extractor_rationale_171",
-      "label": "Byte che non sono un'immagine: si salta con il motivo, senza sollevare.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "byte che non sono un'immagine: si salta con il motivo, senza sollevare.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L171"
-    },
-    {
-      "id": "tests_test_extractor_rationale_20",
-      "label": "Prima si prova a leggere il PDF: se il testo c'e', non si chiama l'OCR.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "prima si prova a leggere il pdf: se il testo c'e', non si chiama l'ocr.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L20"
-    },
-    {
-      "id": "tests_test_extractor_rationale_201",
-      "label": "Poche lettere nel livello di testo = PDF scansionato con intestazione.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "poche lettere nel livello di testo = pdf scansionato con intestazione.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L201"
-    },
-    {
-      "id": "tests_test_extractor_rationale_33",
-      "label": "Poche lettere sono il tipico PDF scansionato con la sola intestazione.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "poche lettere sono il tipico pdf scansionato con la sola intestazione.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L33"
-    },
-    {
-      "id": "tests_test_extractor_rationale_45",
-      "label": "PDF malformato: pypdf non ne cava nulla, ci prova l'OCR.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "pdf malformato: pypdf non ne cava nulla, ci prova l'ocr.",
-      "source_file": "tests/test_extractor.py",
-      "source_location": "L45"
-    },
-    {
-      "id": "tests_test_extractor_rationale_85",
-      "label": "Oltre il limite di pagine del piano, il PDF va inviato a pezzi.",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "FakeOcrClient",
-      "file_type": "rationale",
-      "norm_label": "oltre il limite di pagine del piano, il pdf va inviato a pezzi.",
-      "source_file": "tests/test_extractor.py",
       "source_location": "L85"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_py_any",
+      "label": "Any",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "code",
+      "norm_label": "any",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_102",
+      "label": "Parser a discesa ricorsiva che non si ferma davanti agli errori tipici. Le\u2026",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "parser a discesa ricorsiva che non si ferma davanti agli errori tipici. le...",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L102"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_206",
+      "label": "Legge una chiave, oppure restituisce None senza consumare nulla. Serve a\u2026",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "legge una chiave, oppure restituisce none senza consumare nulla. serve a...",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L206"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_227",
+      "label": "Numeri, ``true``/``false``/``null`` e valori scritti senza virgolette.",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "numeri, ``true``/``false``/``null`` e valori scritti senza virgolette.",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L227"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_277",
+      "label": "La virgoletta corrente chiude davvero la stringa?",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "la virgoletta corrente chiude davvero la stringa?",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L277"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_295",
+      "label": "Legge una sequenza di escape, tollerando quelle inesistenti.",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "legge una sequenza di escape, tollerando quelle inesistenti.",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L295"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_323",
+      "label": "Primo carattere non bianco da ``start``, con la sua posizione.",
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "_TolerantParser",
+      "file_type": "rationale",
+      "norm_label": "primo carattere non bianco da ``start``, con la sua posizione.",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L323"
     },
     {
       "id": "src_inoltro_email_inbound_py_path",
@@ -7904,6 +7947,17 @@
       "norm_label": "parametrize",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "src_inoltro_email_confidence_rationale_435",
+      "label": "Solo il testo leggibile: via gli indirizzi e le righe di instradamento.",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "matching.py",
+      "file_type": "rationale",
+      "norm_label": "solo il testo leggibile: via gli indirizzi e le righe di instradamento.",
+      "source_file": "src/inoltro_email/confidence.py",
+      "source_location": "L435"
     },
     {
       "id": "src_inoltro_email_config_rationale_67",
@@ -8075,84 +8129,18 @@
       "label": "Connection",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "connection",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "fastapi",
-      "label": "FastAPI",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "fastapi",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "request",
-      "label": "Request",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "request",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_inoltro_email_api_app",
-      "label": "app.py",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "app.py",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_inoltro_email_api_app_py_any",
-      "label": "Any",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "src_inoltro_email_api_init",
-      "label": "api/__init__.py",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "api/__init__.py",
-      "source_file": "src/inoltro_email/api/__init__.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_inoltro_email_init",
-      "label": "inoltro_email/__init__.py",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "code",
-      "norm_label": "inoltro_email/__init__.py",
-      "source_file": "src/inoltro_email/__init__.py",
-      "source_location": "L1"
-    },
-    {
       "id": "src_inoltro_email_message_guard",
       "label": "message_guard.py",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "message_guard.py",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8163,7 +8151,7 @@
       "label": "Any",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "any",
       "source_file": "",
@@ -8174,7 +8162,7 @@
       "label": "datetime",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "datetime",
       "source_file": "",
@@ -8185,7 +8173,7 @@
       "label": "Path",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "path",
       "source_file": "",
@@ -8196,117 +8184,18 @@
       "label": "ValueError",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "code",
       "norm_label": "valueerror",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_1",
-      "label": "Applicazione HTTP (FastAPI) interrogata da Power Automate. Un solo endpoint fa\u2026",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "applicazione http (fastapi) interrogata da power automate. un solo endpoint fa...",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_375",
-      "label": "Confronto della chiave condivisa con Power Automate.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "confronto della chiave condivisa con power automate.",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L375"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_387",
-      "label": "Confronto a tempo costante: non rivela quanti caratteri combaciano.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "confronto a tempo costante: non rivela quanti caratteri combaciano.",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L387"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_392",
-      "label": "Legge pochi campi del JSON senza costruire l'email o gli allegati.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "legge pochi campi del json senza costruire l'email o gli allegati.",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L392"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_406",
-      "label": "Risposta 2xx: il flow puo' ignorarla senza ritentare la HTTP action.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "risposta 2xx: il flow puo' ignorarla senza ritentare la http action.",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L406"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_418",
-      "label": "Legge il corpo della richiesta e lo interpreta. Restituisce ``(payload,\u2026",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "legge il corpo della richiesta e lo interpreta. restituisce ``(payload,...",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L418"
-    },
-    {
-      "id": "src_inoltro_email_api_app_rationale_91",
-      "label": "Serializza un payload in modo robusto per il logging di debug.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "serializza un payload in modo robusto per il logging di debug.",
-      "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L91"
-    },
-    {
-      "id": "src_inoltro_email_api_init_rationale_1",
-      "label": "Servizio HTTP interrogato da Power Automate.",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "servizio http interrogato da power automate.",
-      "source_file": "src/inoltro_email/api/__init__.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_inoltro_email_init_rationale_1",
-      "label": "Servizio HTTP di analisi delle email di telemedicina. Riceve da Power Automate\u2026",
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "app.py",
-      "file_type": "rationale",
-      "norm_label": "servizio http di analisi delle email di telemedicina. riceve da power automate...",
-      "source_file": "src/inoltro_email/__init__.py",
-      "source_location": "L1"
-    },
-    {
       "id": "src_inoltro_email_message_guard_rationale_1",
       "label": "Controlli locali, economici, prima dell'analisi di una email. Il database resta\u2026",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "controlli locali, economici, prima dell'analisi di una email. il database resta...",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8317,7 +8206,7 @@
       "label": "Usa l'ID Outlook; senza ID crea una firma stabile del messaggio.",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "usa l'id outlook; senza id crea una firma stabile del messaggio.",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8328,7 +8217,7 @@
       "label": "Il campo ``date``/``receivedDateTime`` non e' utilizzabile.",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "il campo ``date``/``receiveddatetime`` non e' utilizzabile.",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8339,7 +8228,7 @@
       "label": "Registro SQLite persistente e sicuro anche con piu' worker.",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "registro sqlite persistente e sicuro anche con piu' worker.",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8350,7 +8239,7 @@
       "label": "Restituisce se la data e' nella finestra e la sua eta' in secondi.",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "restituisce se la data e' nella finestra e la sua eta' in secondi.",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8361,7 +8250,7 @@
       "label": "Salva il messaggio e lo riserva all'analisi. L'inserimento atomico e' anche il\u2026",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "salva il messaggio e lo riserva all'analisi. l'inserimento atomico e' anche il...",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8372,7 +8261,7 @@
       "label": "Rimuove la prenotazione se un errore inatteso blocca l'analisi.",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "rimuove la prenotazione se un errore inatteso blocca l'analisi.",
       "source_file": "src/inoltro_email/message_guard.py",
@@ -8383,11 +8272,22 @@
       "label": "Legge ISO 8601 e i formati data del flow Power Automate. Le date senza fuso\u2026",
       "_origin": "ast",
       "community": 21,
-      "community_name": "app.py",
+      "community_name": "LocalMessageStore",
       "file_type": "rationale",
       "norm_label": "legge iso 8601 e i formati data del flow power automate. le date senza fuso...",
       "source_file": "src/inoltro_email/message_guard.py",
       "source_location": "L92"
+    },
+    {
+      "id": "src_inoltro_email_rawjson_rationale_122",
+      "label": "Riparazioni applicate, con il numero di occorrenze.",
+      "_origin": "ast",
+      "community": 22,
+      "community_name": ".repairs",
+      "file_type": "rationale",
+      "norm_label": "riparazioni applicate, con il numero di occorrenze.",
+      "source_file": "src/inoltro_email/rawjson.py",
+      "source_location": "L122"
     },
     {
       "id": "enum",
@@ -8542,6 +8442,171 @@
       "norm_label": ".opencode/plugins/graphify.js",
       "source_file": ".opencode/opencode.json",
       "source_location": "L3"
+    },
+    {
+      "id": "fastapi",
+      "label": "FastAPI",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "fastapi",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "request",
+      "label": "Request",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "request",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_inoltro_email_api_app",
+      "label": "app.py",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "app.py",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_api_app_py_any",
+      "label": "Any",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "any",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "src_inoltro_email_api_init",
+      "label": "api/__init__.py",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "api/__init__.py",
+      "source_file": "src/inoltro_email/api/__init__.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_init",
+      "label": "inoltro_email/__init__.py",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "code",
+      "norm_label": "inoltro_email/__init__.py",
+      "source_file": "src/inoltro_email/__init__.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_1",
+      "label": "Applicazione HTTP (FastAPI) interrogata da Power Automate. Un solo endpoint fa\u2026",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "applicazione http (fastapi) interrogata da power automate. un solo endpoint fa...",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_375",
+      "label": "Confronto della chiave condivisa con Power Automate.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "confronto della chiave condivisa con power automate.",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L375"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_387",
+      "label": "Confronto a tempo costante: non rivela quanti caratteri combaciano.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "confronto a tempo costante: non rivela quanti caratteri combaciano.",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L387"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_392",
+      "label": "Legge pochi campi del JSON senza costruire l'email o gli allegati.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "legge pochi campi del json senza costruire l'email o gli allegati.",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L392"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_406",
+      "label": "Risposta 2xx: il flow puo' ignorarla senza ritentare la HTTP action.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "risposta 2xx: il flow puo' ignorarla senza ritentare la http action.",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L406"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_418",
+      "label": "Legge il corpo della richiesta e lo interpreta. Restituisce ``(payload,\u2026",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "legge il corpo della richiesta e lo interpreta. restituisce ``(payload,...",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L418"
+    },
+    {
+      "id": "src_inoltro_email_api_app_rationale_91",
+      "label": "Serializza un payload in modo robusto per il logging di debug.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "serializza un payload in modo robusto per il logging di debug.",
+      "source_file": "src/inoltro_email/api/app.py",
+      "source_location": "L91"
+    },
+    {
+      "id": "src_inoltro_email_api_init_rationale_1",
+      "label": "Servizio HTTP interrogato da Power Automate.",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "servizio http interrogato da power automate.",
+      "source_file": "src/inoltro_email/api/__init__.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_init_rationale_1",
+      "label": "Servizio HTTP di analisi delle email di telemedicina. Riceve da Power Automate\u2026",
+      "_origin": "ast",
+      "community": 28,
+      "community_name": "app.py",
+      "file_type": "rationale",
+      "norm_label": "servizio http di analisi delle email di telemedicina. riceve da power automate...",
+      "source_file": "src/inoltro_email/__init__.py",
+      "source_location": "L1"
     },
     {
       "id": "opencode_plugins_graphify",
@@ -8729,17 +8794,6 @@
       "norm_label": "prima zona in cui compare il termine. restituisce ``(zona, forma scorretta)``:...",
       "source_file": "src/inoltro_email/confidence.py",
       "source_location": "L409"
-    },
-    {
-      "id": "src_inoltro_email_confidence_rationale_435",
-      "label": "Solo il testo leggibile: via gli indirizzi e le righe di instradamento.",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ConfidenceSettings",
-      "file_type": "rationale",
-      "norm_label": "solo il testo leggibile: via gli indirizzi e le righe di instradamento.",
-      "source_file": "src/inoltro_email/confidence.py",
-      "source_location": "L435"
     },
     {
       "id": "src_inoltro_email_confidence_rationale_441",
@@ -9009,6 +9063,17 @@
       "source_location": ""
     },
     {
+      "id": "src_inoltro_email_api_server_rationale_61",
+      "label": "Avvia il server HTTP (bloccante) fino a Ctrl+C.",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "config.py",
+      "file_type": "rationale",
+      "norm_label": "avvia il server http (bloccante) fino a ctrl+c.",
+      "source_file": "src/inoltro_email/api/server.py",
+      "source_location": "L61"
+    },
+    {
       "id": "src_inoltro_email_config_rationale_1",
       "label": "Caricamento e validazione della configurazione. La configurazione arriva da due\u2026",
       "_origin": "ast",
@@ -9174,17 +9239,6 @@
       "source_location": "L1"
     },
     {
-      "id": "src_inoltro_email_rawjson_py_any",
-      "label": "Any",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "code",
-      "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "src_inoltro_email_rawjson_py_valueerror",
       "label": "ValueError",
       "_origin": "ast",
@@ -9216,83 +9270,6 @@
       "norm_label": "lettura tollerante del json inviato da power automate. il flusso costruisce il...",
       "source_file": "src/inoltro_email/rawjson.py",
       "source_location": "L1"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_102",
-      "label": "Parser a discesa ricorsiva che non si ferma davanti agli errori tipici. Le\u2026",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "parser a discesa ricorsiva che non si ferma davanti agli errori tipici. le...",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L102"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_122",
-      "label": "Riparazioni applicate, con il numero di occorrenze.",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "riparazioni applicate, con il numero di occorrenze.",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L122"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_206",
-      "label": "Legge una chiave, oppure restituisce None senza consumare nulla. Serve a\u2026",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "legge una chiave, oppure restituisce none senza consumare nulla. serve a...",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L206"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_227",
-      "label": "Numeri, ``true``/``false``/``null`` e valori scritti senza virgolette.",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "numeri, ``true``/``false``/``null`` e valori scritti senza virgolette.",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L227"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_277",
-      "label": "La virgoletta corrente chiude davvero la stringa?",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "la virgoletta corrente chiude davvero la stringa?",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L277"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_295",
-      "label": "Legge una sequenza di escape, tollerando quelle inesistenti.",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "legge una sequenza di escape, tollerando quelle inesistenti.",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L295"
-    },
-    {
-      "id": "src_inoltro_email_rawjson_rationale_323",
-      "label": "Primo carattere non bianco da ``start``, con la sua posizione.",
-      "_origin": "ast",
-      "community": 5,
-      "community_name": "loads_tolerant",
-      "file_type": "rationale",
-      "norm_label": "primo carattere non bianco da ``start``, con la sua posizione.",
-      "source_file": "src/inoltro_email/rawjson.py",
-      "source_location": "L323"
     },
     {
       "id": "src_inoltro_email_rawjson_rationale_53",
@@ -11254,7 +11231,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -11266,7 +11243,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L35",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -18238,7 +18215,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L28",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -18250,7 +18227,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L37",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -18262,7 +18239,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L43",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -18274,7 +18251,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L59",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -18286,7 +18263,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L74",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -18298,7 +18275,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L94",
+      "source_location": "L91",
       "weight": 1.0
     },
     {
@@ -18310,7 +18287,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L65",
+      "source_location": "L62",
       "weight": 1.0
     },
     {
@@ -18322,7 +18299,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L111",
+      "source_location": "L108",
       "weight": 1.0
     },
     {
@@ -19210,7 +19187,7 @@
       "confidence_score": 1.0,
       "context": "decorator",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L17",
+      "source_location": "L14",
       "weight": 1.0
     },
     {
@@ -20422,7 +20399,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L17",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -20434,7 +20411,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L18",
+      "source_location": "L17",
       "weight": 1.0
     },
     {
@@ -20446,7 +20423,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L19",
+      "source_location": "L18",
       "weight": 1.0
     },
     {
@@ -21526,7 +21503,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L17",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -21538,7 +21515,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L18",
+      "source_location": "L17",
       "weight": 1.0
     },
     {
@@ -21550,7 +21527,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L19",
+      "source_location": "L18",
       "weight": 1.0
     },
     {
@@ -22294,7 +22271,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L14",
+      "source_location": "L11",
       "weight": 1.0
     },
     {
@@ -24118,7 +24095,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L27",
+      "source_location": "L24",
       "weight": 1.0
     },
     {
@@ -24130,7 +24107,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L32",
+      "source_location": "L29",
       "weight": 1.0
     },
     {
@@ -24142,7 +24119,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L40",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -24154,7 +24131,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L56",
+      "source_location": "L53",
       "weight": 1.0
     },
     {
@@ -24166,7 +24143,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L69",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -24178,31 +24155,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L87",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "target": "tests_test_logging_setup_py_monkeypatch",
-      "relation": "references",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "parameter_type",
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L143",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "target": "tests_test_logging_setup_py_path",
-      "relation": "references",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "parameter_type",
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L143",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -24214,7 +24167,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L64",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -24226,7 +24179,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L105",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -24238,7 +24191,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L120",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -24250,7 +24203,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L120",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -24882,7 +24835,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L27",
+      "source_location": "L28",
       "weight": 1.0
     },
     {
@@ -28226,7 +28179,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L105",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -28237,18 +28190,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L120",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_logging_setup",
-      "target": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L143",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -28259,7 +28201,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L18",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -28270,7 +28212,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L27",
+      "source_location": "L24",
       "weight": 1.0
     },
     {
@@ -28281,7 +28223,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L32",
+      "source_location": "L29",
       "weight": 1.0
     },
     {
@@ -28292,7 +28234,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L40",
+      "source_location": "L37",
       "weight": 1.0
     },
     {
@@ -28303,7 +28245,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L56",
+      "source_location": "L53",
       "weight": 1.0
     },
     {
@@ -28314,7 +28256,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L64",
+      "source_location": "L61",
       "weight": 1.0
     },
     {
@@ -28325,7 +28267,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L69",
+      "source_location": "L66",
       "weight": 1.0
     },
     {
@@ -28336,7 +28278,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L87",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -30496,14 +30438,14 @@
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_server_rationale_28",
+      "source": "src_inoltro_email_api_server_rationale_29",
       "target": "src_inoltro_email_api_server_configure_reload_worker_logging",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/server.py",
-      "source_location": "L28",
+      "source_location": "L29",
       "weight": 1.0
     },
     {
@@ -32806,69 +32748,58 @@
       "weight": 1.0
     },
     {
-      "source": "tests_test_logging_setup_rationale_106",
+      "source": "tests_test_logging_setup_rationale_103",
       "target": "tests_test_logging_setup_test_setup_logging_pulisce_i_vecchi",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L106",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
-      "source": "tests_test_logging_setup_rationale_123",
+      "source": "tests_test_logging_setup_rationale_120",
       "target": "tests_test_logging_setup_test_worker_reload_riusa_il_file_della_sessione",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L123",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
-      "source": "tests_test_logging_setup_rationale_146",
-      "target": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L146",
-      "weight": 1.0
-    },
-    {
-      "source": "tests_test_logging_setup_rationale_19",
+      "source": "tests_test_logging_setup_rationale_16",
       "target": "tests_test_logging_setup_ripristina_logger",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L19",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
-      "source": "tests_test_logging_setup_rationale_33",
+      "source": "tests_test_logging_setup_rationale_30",
       "target": "tests_test_logging_setup_test_nome_progressivo_se_il_file_esiste",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L33",
+      "source_location": "L30",
       "weight": 1.0
     },
     {
-      "source": "tests_test_logging_setup_rationale_88",
+      "source": "tests_test_logging_setup_rationale_85",
       "target": "tests_test_logging_setup_test_pulizia_non_tocca_altri_file",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "tests/test_logging_setup.py",
-      "source_location": "L88",
+      "source_location": "L85",
       "weight": 1.0
     },
     {
@@ -36122,17 +36053,6 @@
       "confidence_score": 0.95,
       "source_file": "tests/test_inbound.py",
       "source_location": "L200",
-      "weight": 0.8
-    },
-    {
-      "source": "tests_test_logging_setup_test_reload_passa_il_log_di_sessione_al_worker",
-      "target": "src_inoltro_email_config_settings",
-      "relation": "uses",
-      "_origin": "ast",
-      "confidence": "INFERRED",
-      "confidence_score": 0.95,
-      "source_file": "tests/test_logging_setup.py",
-      "source_location": "L158",
       "weight": 0.8
     },
     {

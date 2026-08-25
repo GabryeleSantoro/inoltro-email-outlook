@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import io
 import sys
+from datetime import datetime, timezone
+from uuid import uuid4
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -101,14 +103,15 @@ def email_payload(
     **extra: Any,
 ) -> Dict[str, Any]:
     """Payload come quello inviato dall'azione HTTP di Power Automate."""
+    message_token = uuid4().hex
     payload: Dict[str, Any] = {
-        "id": "AAMkAGI2TEST",
-        "internetMessageId": "<msg-1@example.com>",
+        "id": f"AAMkAGI2TEST-{message_token}",
+        "internetMessageId": f"<msg-{message_token}@example.com>",
         "subject": subject,
         "body": body,
         "isHtml": False,
         "from": "paziente@example.com",
-        "receivedDateTime": "2026-08-19T08:00:00Z",
+        "receivedDateTime": datetime.now(timezone.utc).isoformat(),
         "hasAttachment": bool(attachments),
         "attachments": attachments or [],
     }

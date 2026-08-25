@@ -31,6 +31,7 @@ def analysis_to_dict(
     return {
         "id_messaggio": analysis.message_key,
         "oggetto": analysis.subject,
+        "considerata": True,
         "esito": analysis.esito.value,
         "conforme": analysis.conforme,
         # Verdetto sintetico: e' una prenotazione di telemedicina? Vale solo se

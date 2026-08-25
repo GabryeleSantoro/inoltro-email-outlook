@@ -18,7 +18,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Mapping, Optional, Tuple
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -29,6 +29,7 @@ from ..analysis import EmailAnalyzer
 from ..config import Settings
 from ..flow_runner import FlowRunner
 from ..inbound import InboundError, parse_email
+from ..message_guard import LocalMessageStore, MessageDateError
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
 from ..rawjson import RawJsonError, loads_tolerant
@@ -54,6 +55,8 @@ RICHIESTA_TROPPO_GRANDE = 413
 # richiesta. Entrambe le risposte portano il verdetto completo nel corpo.
 ANALISI_CERTA = 200
 ANALISI_SENZA_PRENOTAZIONE = 202
+MESSAGGIO_IGNORATO = 202
+DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
 
 # Il flusso in produzione manda gli allegati come percorsi su disco: la forma
 # e' diversa da quella del connettore Outlook, il servizio le accetta entrambe.
@@ -98,12 +101,16 @@ def create_app(
     analyzer: Optional[EmailAnalyzer] = None,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
+    message_store_path: Optional[Path] = None,
 ) -> FastAPI:
     """Costruisce l'applicazione.
 
     ``analyzer`` si passa solo nei test, per evitare chiamate reali a ocr.space.
     """
     settings = settings or Settings.load()
+    if flow_timer <= 0:
+        raise ValueError("flow_timer deve essere maggiore di zero.")
+    store_path = message_store_path or DEFAULT_MESSAGE_STORE_PATH
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -115,6 +122,7 @@ def create_app(
             )
         else:
             application.state.analyzer = analyzer
+        application.state.message_store = LocalMessageStore(store_path)
 
         flow_runner: Optional[FlowRunner] = None
         if flow_path:
@@ -244,6 +252,32 @@ def create_app(
         _check_api_key(settings, x_api_key)
         payload, repairs = await _read_json(request, settings.api.max_request_bytes)
 
+        # Deve restare prima di parse_email: per un messaggio vecchio non
+        # decodifichiamo nemmeno gli allegati base64, tanto meno chiamiamo OCR.
+        window_seconds = flow_timer * 2
+        received_at = _payload_value(payload, "receivedDateTime", "received", "date")
+        if received_at:
+            try:
+                fresh, age_seconds = request.app.state.message_store.is_fresh(
+                    received_at, window_seconds=window_seconds
+                )
+            except MessageDateError as exc:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+            if not fresh:
+                subject = _payload_value(payload, "subject")
+                message_key = _payload_value(payload, "internetMessageId", "id", "messageId")
+                logger.info("Messaggio ignorato per data: '%s', eta %.0f s (limite %d s).",
+                            subject or "(senza oggetto)", age_seconds, window_seconds)
+                logger.info(
+                    "EMAIL SCARTATA | motivo=fuori_finestra_temporale | id=%s | "
+                    "ricevuta_il=%s | oggetto='%s'",
+                    message_key or "(senza id)", received_at, subject or "(senza oggetto)",
+                )
+                return JSONResponse(
+                    _ignored_message(message_key, subject, "fuori_finestra_temporale", window_seconds),
+                    status_code=MESSAGGIO_IGNORATO,
+                )
+
         try:
             email = parse_email(
                 payload,
@@ -259,6 +293,26 @@ def create_app(
             )
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+        if not received_at:
+            try:
+                request.app.state.message_store.is_fresh(
+                    email.received_at, window_seconds=window_seconds
+                )
+            except MessageDateError as exc:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        if not request.app.state.message_store.claim(email, payload):
+            logger.info("Messaggio gia' analizzato: %s.", email.key)
+            logger.info(
+                "EMAIL SCARTATA | motivo=gia_analizzato | id=%s | ricevuta_il=%s | "
+                "oggetto='%s'",
+                email.key, email.received_at, email.subject or "(senza oggetto)",
+            )
+            return JSONResponse(
+                _ignored_message(email.key, email.subject, "gia_analizzato", window_seconds),
+                status_code=MESSAGGIO_IGNORATO,
+            )
+
         if repairs:
             # Il payload e' stato accettato ma era da riparare: chi legge la
             # risposta deve poterlo sapere e correggere il flusso a monte.
@@ -271,9 +325,22 @@ def create_app(
             email.subject or "(senza oggetto)", email.sender or "mittente ignoto",
             len(email.attachments),
         )
-        analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+        try:
+            analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+        except Exception:
+            request.app.state.message_store.release(email)
+            raise
 
         stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
+        if analysis.esito.value == "scartata":
+            logger.info(
+                "EMAIL SCARTATA | motivo=screening | id=%s | ricevuta_il=%s | oggetto='%s'",
+                email.key, email.received_at, email.subject or "(senza oggetto)",
+            )
+        logger.info(
+            "EMAIL ANALIZZATA | id=%s | ricevuta_il=%s | esito=%s | http=%d | durata_ms=%d",
+            email.key, email.received_at, analysis.esito.value, stato, analysis.duration_ms,
+        )
         logger.info(
             "Risposta %d per '%s': telemedicina %s, prenotazione %s (soglia di certezza %.0f%%).",
             stato, email.subject or "(senza oggetto)",
@@ -319,6 +386,32 @@ def _check_api_key(settings: Settings, provided: Optional[str]) -> None:
 def _constant_time_equals(left: str, right: str) -> bool:
     """Confronto a tempo costante: non rivela quanti caratteri combaciano."""
     return hmac.compare_digest(left, right)
+
+
+def _payload_value(payload: Any, *names: str) -> str:
+    """Legge pochi campi del JSON senza costruire l'email o gli allegati."""
+    if not isinstance(payload, Mapping):
+        return ""
+    values = {str(key).lower(): value for key, value in payload.items()}
+    for name in names:
+        value = values.get(name.lower())
+        if value is not None:
+            text = str(value).strip()
+            if text:
+                return text
+    return ""
+
+
+def _ignored_message(message_key: str, subject: str, reason: str, window_seconds: int) -> dict:
+    """Risposta 2xx: il flow puo' ignorarla senza ritentare la HTTP action."""
+    return {
+        "id_messaggio": message_key or "(senza id)",
+        "oggetto": subject,
+        "esito": "ignorata",
+        "considerata": False,
+        "motivo": reason,
+        "finestra_secondi": window_seconds,
+    }
 
 
 async def _read_json(request: Request, max_bytes: int) -> Tuple[Any, List[str]]:
