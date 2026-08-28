@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 import sqlite3
 
 import pytest
@@ -104,6 +105,34 @@ def test_email_gia_vista_non_viene_analizzata_due_volte(
     with sqlite3.connect(database) as connection:
         stored = connection.execute("SELECT payload_json FROM checked_messages").fetchone()
     assert stored is not None and '"subject"' in stored[0]
+
+
+def test_riepilogo_sessione_elenca_inoltri_e_scarti(
+    settings: Settings, ocr: FakeOcrClient, tmp_path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Il termine della sessione lascia un elenco leggibile, non solo righe sparse."""
+    caplog.set_level(logging.INFO, logger="inoltro_email.api.app")
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+    old_payload = email_payload(
+        subject="Messaggio vecchio",
+        receivedDateTime="",
+        date=(datetime.now(timezone.utc) - timedelta(seconds=121)).isoformat(),
+    )
+
+    with TestClient(create_app(
+        settings, analyzer=analyzer, flow_timer=60,
+        message_store_path=tmp_path / "checked.sqlite3",
+    )) as instance:
+        assert instance.post("/analizza-email", json=payload).status_code == 200
+        assert instance.post("/analizza-email", json=old_payload).status_code == 202
+
+    log = caplog.text
+    assert "===== RIEPILOGO EMAIL SESSIONE =====" in log
+    assert "EMAIL DA INOLTRARE: 1" in log
+    assert "EMAIL SCARTATE: 1" in log
+    assert "Messaggio vecchio" in log
+    assert "motivo=fuori_finestra_temporale" in log
 
 
 def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:

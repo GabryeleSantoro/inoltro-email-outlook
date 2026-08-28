@@ -33,6 +33,7 @@ from ..message_guard import LocalMessageStore, MessageDateError
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
 from ..rawjson import RawJsonError, loads_tolerant
+from ..session_report import EmailSessionReport
 from .responses import analysis_to_dict
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,7 @@ def create_app(
         else:
             application.state.analyzer = analyzer
         application.state.message_store = LocalMessageStore(store_path)
+        application.state.email_session_report = EmailSessionReport()
 
         flow_runner: Optional[FlowRunner] = None
         if flow_path:
@@ -159,6 +161,7 @@ def create_app(
         try:
             yield
         finally:
+            application.state.email_session_report.log_summary(logger)
             if flow_runner is not None:
                 flow_runner.stop()
             if owned_client is not None:
@@ -273,6 +276,12 @@ def create_app(
                     "ricevuta_il=%s | oggetto='%s'",
                     message_key or "(senza id)", received_at, subject or "(senza oggetto)",
                 )
+                request.app.state.email_session_report.discarded(
+                    message_key=message_key,
+                    received_at=received_at,
+                    subject=subject,
+                    reason="fuori_finestra_temporale",
+                )
                 return JSONResponse(
                     _ignored_message(message_key, subject, "fuori_finestra_temporale", window_seconds),
                     status_code=MESSAGGIO_IGNORATO,
@@ -308,6 +317,12 @@ def create_app(
                 "oggetto='%s'",
                 email.key, email.received_at, email.subject or "(senza oggetto)",
             )
+            request.app.state.email_session_report.discarded(
+                message_key=email.key,
+                received_at=email.received_at,
+                subject=email.subject,
+                reason="gia_analizzato",
+            )
             return JSONResponse(
                 _ignored_message(email.key, email.subject, "gia_analizzato", window_seconds),
                 status_code=MESSAGGIO_IGNORATO,
@@ -321,8 +336,9 @@ def create_app(
             )
 
         logger.info(
-            "Richiesta di analisi: '%s' da %s, %d file.",
-            email.subject or "(senza oggetto)", email.sender or "mittente ignoto",
+            "EMAIL RICEVUTA | id=%s | ricevuta_il=%s | da=%s | oggetto='%s' | allegati=%d",
+            email.key, email.received_at or "(data assente)",
+            email.sender or "mittente ignoto", email.subject or "(senza oggetto)",
             len(email.attachments),
         )
         try:
@@ -332,10 +348,23 @@ def create_app(
             raise
 
         stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
+        session_record = request.app.state.email_session_report.analyzed(email, analysis)
         if analysis.esito.value == "scartata":
             logger.info(
                 "EMAIL SCARTATA | motivo=screening | id=%s | ricevuta_il=%s | oggetto='%s'",
                 email.key, email.received_at, email.subject or "(senza oggetto)",
+            )
+        elif session_record.stato == "DA_INOLTRARE":
+            logger.info(
+                "EMAIL DA INOLTRARE | id=%s | ricevuta_il=%s | oggetto='%s' | motivo=%s",
+                email.key, email.received_at, email.subject or "(senza oggetto)",
+                session_record.reason,
+            )
+        else:
+            logger.info(
+                "EMAIL NON INOLTRATA | id=%s | ricevuta_il=%s | oggetto='%s' | motivo=%s",
+                email.key, email.received_at, email.subject or "(senza oggetto)",
+                session_record.reason,
             )
         logger.info(
             "EMAIL ANALIZZATA | id=%s | ricevuta_il=%s | esito=%s | http=%d | durata_ms=%d",
