@@ -63,7 +63,7 @@ def test_email_conforme(client: TestClient) -> None:
     assert corpo["id_messaggio"].startswith("<msg-")
 
 
-def test_email_fuori_dalla_finestra_non_viene_analizzata(
+def test_email_vecchia_viene_analizzata(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
     analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
@@ -78,11 +78,9 @@ def test_email_fuori_dalla_finestra_non_viene_analizzata(
     )) as instance:
         risposta = instance.post("/analizza-email", json=payload)
 
-    assert risposta.status_code == 202
-    assert risposta.json()["considerata"] is False
-    assert risposta.json()["motivo"] == "fuori_finestra_temporale"
-    assert risposta.json()["finestra_secondi"] == 120
-    assert ocr.calls == []
+    assert risposta.status_code == 200
+    assert risposta.json()["considerata"] is True
+    assert ocr.calls == ["impegnativa.pdf"]
 
 
 def test_email_gia_vista_non_viene_analizzata_due_volte(
@@ -114,25 +112,18 @@ def test_riepilogo_sessione_elenca_inoltri_e_scarti(
     caplog.set_level(logging.INFO, logger="inoltro_email.api.app")
     analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
     payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
-    old_payload = email_payload(
-        subject="Messaggio vecchio",
-        receivedDateTime="",
-        date=(datetime.now(timezone.utc) - timedelta(seconds=121)).isoformat(),
-    )
-
     with TestClient(create_app(
-        settings, analyzer=analyzer, flow_timer=60,
+        settings, analyzer=analyzer,
         message_store_path=tmp_path / "checked.sqlite3",
     )) as instance:
         assert instance.post("/analizza-email", json=payload).status_code == 200
-        assert instance.post("/analizza-email", json=old_payload).status_code == 202
+        assert instance.post("/analizza-email", json=payload).status_code == 202
 
     log = caplog.text
     assert "===== RIEPILOGO EMAIL SESSIONE =====" in log
     assert "EMAIL DA INOLTRARE: 1" in log
     assert "EMAIL SCARTATE: 1" in log
-    assert "Messaggio vecchio" in log
-    assert "motivo=fuori_finestra_temporale" in log
+    assert "motivo=gia_analizzato" in log
 
 
 def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:

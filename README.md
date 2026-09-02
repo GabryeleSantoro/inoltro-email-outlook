@@ -17,10 +17,9 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
    determinate;
 4. calcola un **punteggio di sentiment** del messaggio.
 
-Prima dell'analisi, il servizio controlla la data dell'email e il registro
-locale dei messaggi gia' visti. Con `--flow-timer 60` sono ammesse solo email
-inviate negli ultimi **120 secondi**; una email vecchia o gia' registrata non
-arriva allo screening ne' all'OCR.
+Prima dell'analisi, il servizio controlla il registro locale dei messaggi gia'
+visti. Una email ricevuta in qualunque data viene analizzata una volta sola;
+le chiamate duplicate non arrivano allo screening ne' all'OCR.
 
 Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
 prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
@@ -195,7 +194,7 @@ uv run python -m inoltro_email serve --port 9000 --reload
 # Oppure direttamente (se il venv e' attivo)
 python -m inoltro_email serve
 python -m inoltro_email serve --port 9000 --reload
-# considera messaggi degli ultimi 120 secondi
+# imposta l'intervallo di controllo del flow locale a 60 secondi
 python -m inoltro_email serve --flow-timer 60
 ```
 
@@ -369,11 +368,10 @@ Valori possibili di `esito`:
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
-| `ignorata` | email oltre la finestra temporale o gia' presente nel registro locale |
+| `ignorata` | email gia' presente nel registro locale |
 
 Le risposte `ignorata` usano comunque HTTP `202`, per non far ritentare il flow,
-e includono `considerata: false`, `motivo` (`fuori_finestra_temporale` oppure
-`gia_analizzato`) e `finestra_secondi`. Le email analizzate normalmente hanno
+e includono `considerata: false` e `motivo: gia_analizzato`. Le email analizzate normalmente hanno
 `considerata: true`; usare questo campo nella condizione di Power Automate prima
 di inoltrare o aprire una pratica.
 
@@ -681,10 +679,9 @@ finche' l'OCR non ha finito. Un PDF gia' provvisto di testo si risolve in
 millisecondi, una scansione di piu' pagine puo' richiedere decine di secondi.
 Se i volumi crescono conviene aumentare i `--workers` di uvicorn.
 
-**Chiamate ripetute.** Il servizio non tiene un registro dei messaggi gia'
-analizzati: analizzare due volte la stessa email restituisce lo stesso esito ma
-consuma due volte la quota OCR. Se il flusso puo' ripetere le chiamate, conviene
-filtrare i duplicati in Power Automate sull'`internetMessageId`.
+**Chiamate ripetute.** Il servizio conserva un registro locale dei messaggi
+gia' analizzati: una seconda chiamata per la stessa email restituisce `202` con
+`motivo: gia_analizzato` e non consuma altra quota OCR.
 
 **Riservatezza.** Gli allegati vengono inviati a un servizio esterno
 (ocr.space) per il riconoscimento del testo: se contengono dati personali o

@@ -12,13 +12,9 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping
 
 from .models import InboundEmail
-
-
-class MessageDateError(ValueError):
-    """Il campo ``date``/``receivedDateTime`` non e' utilizzabile."""
 
 
 class LocalMessageStore:
@@ -40,16 +36,6 @@ class LocalMessageStore:
                 )
                 """
             )
-
-    def is_fresh(self, received_at: str, *, window_seconds: int,
-                 now: Optional[datetime] = None) -> tuple[bool, float]:
-        """Restituisce se la data e' nella finestra e la sua eta' in secondi."""
-        sent_at = parse_message_date(received_at)
-        current = now or datetime.now(timezone.utc)
-        if current.tzinfo is None:
-            current = current.replace(tzinfo=timezone.utc)
-        age_seconds = (current.astimezone(timezone.utc) - sent_at).total_seconds()
-        return age_seconds <= window_seconds, age_seconds
 
     def claim(self, email: InboundEmail, payload: Mapping[str, Any]) -> bool:
         """Salva il messaggio e lo riserva all'analisi.
@@ -86,41 +72,6 @@ class LocalMessageStore:
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=10)
-
-
-def parse_message_date(value: str) -> datetime:
-    """Legge ISO 8601 e i formati data del flow Power Automate.
-
-    Le date senza fuso sono interpretate nel fuso locale del server. Il flow
-    attuale usa mese/giorno/anno (es. ``08/20/2026 10:26``).
-    """
-    raw = value.strip()
-    if not raw:
-        raise MessageDateError("Manca la data del messaggio (campo 'date').")
-
-    try:
-        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except ValueError:
-        parsed = None
-        for pattern in (
-            "%m/%d/%Y %H:%M:%S",
-            "%m/%d/%Y %H:%M",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y %H:%M",
-        ):
-            try:
-                parsed = datetime.strptime(raw, pattern)
-                break
-            except ValueError:
-                continue
-        if parsed is None:
-            raise MessageDateError(
-                "Data del messaggio non valida: usare ISO 8601 oppure MM/GG/AAAA HH:MM."
-            ) from None
-
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=datetime.now().astimezone().tzinfo)
-    return parsed.astimezone(timezone.utc)
 
 
 def message_fingerprint(email: InboundEmail) -> str:

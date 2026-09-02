@@ -29,7 +29,7 @@ from ..analysis import EmailAnalyzer
 from ..config import Settings
 from ..flow_runner import FlowRunner
 from ..inbound import InboundError, parse_email
-from ..message_guard import LocalMessageStore, MessageDateError
+from ..message_guard import LocalMessageStore
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
 from ..rawjson import RawJsonError, loads_tolerant
@@ -255,38 +255,6 @@ def create_app(
         _check_api_key(settings, x_api_key)
         payload, repairs = await _read_json(request, settings.api.max_request_bytes)
 
-        # Deve restare prima di parse_email: per un messaggio vecchio non
-        # decodifichiamo nemmeno gli allegati base64, tanto meno chiamiamo OCR.
-        window_seconds = flow_timer * 2
-        received_at = _payload_value(payload, "receivedDateTime", "received", "date")
-        if received_at:
-            try:
-                fresh, age_seconds = request.app.state.message_store.is_fresh(
-                    received_at, window_seconds=window_seconds
-                )
-            except MessageDateError as exc:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-            if not fresh:
-                subject = _payload_value(payload, "subject")
-                message_key = _payload_value(payload, "internetMessageId", "id", "messageId")
-                logger.info("Messaggio ignorato per data: '%s', eta %.0f s (limite %d s).",
-                            subject or "(senza oggetto)", age_seconds, window_seconds)
-                logger.info(
-                    "EMAIL SCARTATA | motivo=fuori_finestra_temporale | id=%s | "
-                    "ricevuta_il=%s | oggetto='%s'",
-                    message_key or "(senza id)", received_at, subject or "(senza oggetto)",
-                )
-                request.app.state.email_session_report.discarded(
-                    message_key=message_key,
-                    received_at=received_at,
-                    subject=subject,
-                    reason="fuori_finestra_temporale",
-                )
-                return JSONResponse(
-                    _ignored_message(message_key, subject, "fuori_finestra_temporale", window_seconds),
-                    status_code=MESSAGGIO_IGNORATO,
-                )
-
         try:
             email = parse_email(
                 payload,
@@ -302,14 +270,6 @@ def create_app(
             )
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-        if not received_at:
-            try:
-                request.app.state.message_store.is_fresh(
-                    email.received_at, window_seconds=window_seconds
-                )
-            except MessageDateError as exc:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
         if not request.app.state.message_store.claim(email, payload):
             logger.info("Messaggio gia' analizzato: %s.", email.key)
             logger.info(
@@ -324,7 +284,7 @@ def create_app(
                 reason="gia_analizzato",
             )
             return JSONResponse(
-                _ignored_message(email.key, email.subject, "gia_analizzato", window_seconds),
+                _ignored_message(email.key, email.subject, "gia_analizzato"),
                 status_code=MESSAGGIO_IGNORATO,
             )
 
@@ -431,7 +391,7 @@ def _payload_value(payload: Any, *names: str) -> str:
     return ""
 
 
-def _ignored_message(message_key: str, subject: str, reason: str, window_seconds: int) -> dict:
+def _ignored_message(message_key: str, subject: str, reason: str) -> dict:
     """Risposta 2xx: il flow puo' ignorarla senza ritentare la HTTP action."""
     return {
         "id_messaggio": message_key or "(senza id)",
@@ -439,7 +399,6 @@ def _ignored_message(message_key: str, subject: str, reason: str, window_seconds
         "esito": "ignorata",
         "considerata": False,
         "motivo": reason,
-        "finestra_secondi": window_seconds,
     }
 
 
