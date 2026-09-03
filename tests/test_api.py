@@ -41,6 +41,7 @@ def test_salute(client: TestClient) -> None:
 def test_informazioni(client: TestClient) -> None:
     corpo = client.get("/").json()
     assert corpo["analisi"] == "/analizza-email"
+    assert corpo["registro"] == "/registra-email"
 
 
 def test_email_conforme(client: TestClient) -> None:
@@ -83,7 +84,7 @@ def test_email_vecchia_viene_analizzata(
     assert ocr.calls == ["impegnativa.pdf"]
 
 
-def test_email_gia_vista_non_viene_analizzata_due_volte(
+def test_email_registrata_non_viene_registrata_due_volte(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
     database = tmp_path / "checked.sqlite3"
@@ -92,20 +93,38 @@ def test_email_gia_vista_non_viene_analizzata_due_volte(
     with TestClient(create_app(
         settings, analyzer=analyzer, message_store_path=database,
     )) as instance:
-        prima = instance.post("/analizza-email", json=payload)
-        seconda = instance.post("/analizza-email", json=payload)
+        prima = instance.post("/registra-email", json=payload)
+        seconda = instance.post("/registra-email", json=payload)
 
-    assert prima.status_code == 200
+    assert prima.status_code == 201
+    assert prima.json()["registrata"] is True
     assert seconda.status_code == 202
     assert seconda.json()["considerata"] is False
-    assert seconda.json()["motivo"] == "gia_analizzato"
-    assert ocr.calls == ["impegnativa.pdf"]
+    assert seconda.json()["motivo"] == "gia_registrato"
+    assert ocr.calls == []
     with sqlite3.connect(database) as connection:
         stored = connection.execute("SELECT payload_json FROM checked_messages").fetchone()
     assert stored is not None and '"subject"' in stored[0]
 
 
-def test_riepilogo_sessione_elenca_inoltri_e_scarti(
+def test_analisi_non_registra_il_messaggio(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    database = tmp_path / "checked.sqlite3"
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+
+    with TestClient(create_app(
+        settings, analyzer=analyzer, message_store_path=database,
+    )) as instance:
+        risposta = instance.post("/analizza-email", json=payload)
+
+    assert risposta.status_code == 200
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM checked_messages").fetchone()[0] == 0
+
+
+def test_registrazione_non_altera_il_riepilogo_analisi(
     settings: Settings, ocr: FakeOcrClient, tmp_path, caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Il termine della sessione lascia un elenco leggibile, non solo righe sparse."""
@@ -117,13 +136,14 @@ def test_riepilogo_sessione_elenca_inoltri_e_scarti(
         message_store_path=tmp_path / "checked.sqlite3",
     )) as instance:
         assert instance.post("/analizza-email", json=payload).status_code == 200
-        assert instance.post("/analizza-email", json=payload).status_code == 202
+        assert instance.post("/registra-email", json=payload).status_code == 201
+        assert instance.post("/registra-email", json=payload).status_code == 202
 
     log = caplog.text
     assert "===== RIEPILOGO EMAIL SESSIONE =====" in log
     assert "EMAIL DA INOLTRARE: 1" in log
-    assert "EMAIL SCARTATE: 1" in log
-    assert "motivo=gia_analizzato" in log
+    assert "EMAIL SCARTATE: 0" in log
+    assert "motivo=gia_registrato" not in log
 
 
 def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:
@@ -245,6 +265,7 @@ def test_salute_resta_pubblica(client_protetto: TestClient) -> None:
 def test_documentazione_openapi_disponibile(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     assert "/analizza-email" in schema["paths"]
+    assert "/registra-email" in schema["paths"]
 
 
 # ----------------------------------------- payload reali del flusso in uso

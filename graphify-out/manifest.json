@@ -48,9 +48,9 @@
     "semantic_hash": "f0959a9a9a00fa996ae03dfa369db1ae"
   },
   "src/inoltro_email/api/app.py": {
-    "mtime": 1788329400.3133917,
-    "seen": 1788331948.2113843,
-    "ast_hash": "9532c7ecb556020268544d9ee47557a8",
+    "mtime": 1788432054.893998,
+    "seen": 1788432188.3068626,
+    "ast_hash": "180a403b5b50544c54adce7ddf92d8a3",
     "semantic_hash": ""
   },
   "src/inoltro_email/api/responses.py": {
@@ -156,9 +156,9 @@
     "semantic_hash": "b8c6a7313d4f97373e5cd73534e5c805"
   },
   "tests/test_api.py": {
-    "mtime": 1788329431.2173276,
-    "seen": 1788331948.211404,
-    "ast_hash": "b2c8c73b966b79424cee8b6d72527784",
+    "mtime": 1788432055.8548582,
+    "seen": 1788432188.3068829,
+    "ast_hash": "5a9e0896063a4084a3f1579f51e145db",
     "semantic_hash": ""
   },
   "tests/test_cli.py": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788329401.284363,
-    "seen": 1788331948.2114148,
-    "ast_hash": "39c560a6f1db2694dff56ecd8be8730d",
+    "mtime": 1788432467.9164643,
+    "seen": 1788432496.0186038,
+    "ast_hash": "2fd707dac3c12a5ff3ec1f36ef796080",
     "semantic_hash": ""
   },
   "config.example.yaml": {
@@ -282,15 +282,21 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/message_guard.py": {
-    "mtime": 1788332000.4213746,
-    "seen": 1788332073.87079,
-    "ast_hash": "4e8dc493a5566600583118959941c052",
+    "mtime": 1788432449.953146,
+    "seen": 1788432496.018576,
+    "ast_hash": "fc2dd66c707322c063e9ae23cc4bec24",
     "semantic_hash": ""
   },
   "src/inoltro_email/session_report.py": {
     "mtime": 1787825360.6421669,
     "seen": 1787825428.7432456,
     "ast_hash": "c060c0010b6e6134730cdbedf9f97f39",
+    "semantic_hash": ""
+  },
+  "tests/test_message_guard.py": {
+    "mtime": 1788432468.4862738,
+    "seen": 1788432496.0185976,
+    "ast_hash": "4ae348c5867c459bc0474b48a2034986",
     "semantic_hash": ""
   }
 }

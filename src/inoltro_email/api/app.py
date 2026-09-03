@@ -1,9 +1,8 @@
 """Applicazione HTTP (FastAPI) interrogata da Power Automate.
 
-Un solo endpoint fa il lavoro: ``POST /analizza-email`` riceve una singola
-email in JSON, la analizza e restituisce il verdetto. Il flusso Power Automate
-usa l'azione "HTTP", passa il messaggio appena arrivato e poi decide cosa fare
-(inoltrare, aprire un ticket, ignorare) leggendo i campi della risposta.
+``POST /analizza-email`` riceve una singola email in JSON e restituisce il
+verdetto. ``POST /registra-email`` riceve lo stesso payload, ma registra solo
+che il flusso ha gia' gestito il messaggio: non avvia screening ne' OCR.
 
 Il client verso ocr.space viene creato una volta sola all'avvio e chiuso allo
 spegnimento: cosi' la connessione TLS si riusa fra una richiesta e l'altra.
@@ -30,6 +29,7 @@ from ..config import Settings
 from ..flow_runner import FlowRunner
 from ..inbound import InboundError, parse_email
 from ..message_guard import LocalMessageStore
+from ..models import InboundEmail
 from ..ocr.extractor import TextExtractor
 from ..ocr.ocrspace import OcrSpaceClient
 from ..rawjson import RawJsonError, loads_tolerant
@@ -57,6 +57,7 @@ RICHIESTA_TROPPO_GRANDE = 413
 ANALISI_CERTA = 200
 ANALISI_SENZA_PRENOTAZIONE = 202
 MESSAGGIO_IGNORATO = 202
+MESSAGGIO_REGISTRATO = 201
 DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
 
 # Il flusso in produzione manda gli allegati come percorsi su disco: la forma
@@ -189,6 +190,7 @@ def create_app(
             "servizio": settings.api.title,
             "versione": __version__,
             "analisi": "/analizza-email",
+            "registro": "/registra-email",
             "documentazione": "/docs",
         }
 
@@ -196,13 +198,15 @@ def create_app(
     def endpoint_errato_root_post() -> JSONResponse:
         """Aiuta a diagnosticare integrazioni che postano sul percorso sbagliato."""
         logger.warning(
-            "Richiesta ricevuta su POST /. Endpoint corretto: POST /analizza-email"
+            "Richiesta ricevuta su POST /. Endpoint corretti: "
+            "POST /analizza-email oppure POST /registra-email"
         )
         return JSONResponse(
             {
-                "errore": "Endpoint errato: usare POST /analizza-email.",
+                "errore": "Endpoint errato: usare POST /analizza-email oppure POST /registra-email.",
                 "codice": status.HTTP_405_METHOD_NOT_ALLOWED,
-                "endpoint_corretto": "/analizza-email",
+                "endpoint_analisi": "/analizza-email",
+                "endpoint_registro": "/registra-email",
             },
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
@@ -253,40 +257,7 @@ def create_app(
         x_api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER),
     ) -> JSONResponse:
         _check_api_key(settings, x_api_key)
-        payload, repairs = await _read_json(request, settings.api.max_request_bytes)
-
-        try:
-            email = parse_email(
-                payload,
-                include_inline_images=settings.attachments.include_inline_images,
-                max_attachment_bytes=settings.attachments.max_bytes,
-                local_files=settings.local_files,
-            )
-        except InboundError as exc:
-            logger.error(
-                "Payload non interpretabile: %s\nPayload completo:\n%s",
-                exc,
-                _payload_to_log(payload),
-            )
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-        if not request.app.state.message_store.claim(email, payload):
-            logger.info("Messaggio gia' analizzato: %s.", email.key)
-            logger.info(
-                "EMAIL SCARTATA | motivo=gia_analizzato | id=%s | ricevuta_il=%s | "
-                "oggetto='%s'",
-                email.key, email.received_at, email.subject or "(senza oggetto)",
-            )
-            request.app.state.email_session_report.discarded(
-                message_key=email.key,
-                received_at=email.received_at,
-                subject=email.subject,
-                reason="gia_analizzato",
-            )
-            return JSONResponse(
-                _ignored_message(email.key, email.subject, "gia_analizzato"),
-                status_code=MESSAGGIO_IGNORATO,
-            )
+        email, _payload, repairs = await _read_email_request(request, settings)
 
         if repairs:
             # Il payload e' stato accettato ma era da riparare: chi legge la
@@ -301,11 +272,7 @@ def create_app(
             email.sender or "mittente ignoto", email.subject or "(senza oggetto)",
             len(email.attachments),
         )
-        try:
-            analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
-        except Exception:
-            request.app.state.message_store.release(email)
-            raise
+        analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
 
         stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
         session_record = request.app.state.email_session_report.analyzed(email, analysis)
@@ -344,6 +311,66 @@ def create_app(
             ),
             status_code=stato,
         )
+
+    @app.post(
+        "/registra-email",
+        tags=["registro"],
+        summary="Registra un messaggio gia' gestito dal flusso",
+        status_code=MESSAGGIO_REGISTRATO,
+        responses={
+            MESSAGGIO_REGISTRATO: {
+                "description": "Messaggio registrato: le chiamate successive con lo "
+                               "stesso messaggio saranno riconosciute come duplicate.",
+            },
+            MESSAGGIO_IGNORATO: {
+                "description": "Messaggio gia' registrato.",
+            },
+        },
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object"},
+                        "example": RICHIESTA_ESEMPIO,
+                        "examples": {
+                            "allegati_in_base64": {"value": RICHIESTA_ESEMPIO},
+                            "allegati_per_percorso": {"value": RICHIESTA_ESEMPIO_PERCORSI},
+                        },
+                    }
+                },
+            }
+        },
+    )
+    async def registra_email(
+        request: Request,
+        x_api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER),
+    ) -> JSONResponse:
+        """Marca un payload come gestito senza svolgere analisi o OCR."""
+        _check_api_key(settings, x_api_key)
+        email, payload, repairs = await _read_email_request(request, settings)
+
+        if not request.app.state.message_store.register(email, payload):
+            logger.info("Messaggio gia' registrato: %s.", email.key)
+            return JSONResponse(
+                _ignored_message(email.key, email.subject, "gia_registrato"),
+                status_code=MESSAGGIO_IGNORATO,
+            )
+
+        logger.info(
+            "EMAIL REGISTRATA | id=%s | ricevuta_il=%s | oggetto='%s' | allegati=%d",
+            email.key, email.received_at or "(data assente)",
+            email.subject or "(senza oggetto)", len(email.attachments),
+        )
+        body = {
+            "id_messaggio": email.key,
+            "oggetto": email.subject,
+            "esito": "registrata",
+            "registrata": True,
+        }
+        if repairs:
+            body["avvisi"] = ["JSON non valido riparato in lettura: " + "; ".join(repairs)]
+        return JSONResponse(body, status_code=MESSAGGIO_REGISTRATO)
 
     @app.exception_handler(HTTPException)
     async def _errore_http(_request: Request, exc: HTTPException) -> JSONResponse:
@@ -400,6 +427,28 @@ def _ignored_message(message_key: str, subject: str, reason: str) -> dict:
         "considerata": False,
         "motivo": reason,
     }
+
+
+async def _read_email_request(
+    request: Request, settings: Settings,
+) -> Tuple[InboundEmail, Mapping[str, Any], List[str]]:
+    """Legge e valida il payload condiviso dagli endpoint email."""
+    payload, repairs = await _read_json(request, settings.api.max_request_bytes)
+    try:
+        email = parse_email(
+            payload,
+            include_inline_images=settings.attachments.include_inline_images,
+            max_attachment_bytes=settings.attachments.max_bytes,
+            local_files=settings.local_files,
+        )
+    except InboundError as exc:
+        logger.error(
+            "Payload non interpretabile: %s\nPayload completo:\n%s",
+            exc,
+            _payload_to_log(payload),
+        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return email, payload, repairs
 
 
 async def _read_json(request: Request, max_bytes: int) -> Tuple[Any, List[str]]:

@@ -17,9 +17,11 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
    determinate;
 4. calcola un **punteggio di sentiment** del messaggio.
 
-Prima dell'analisi, il servizio controlla il registro locale dei messaggi gia'
-visti. Una email ricevuta in qualunque data viene analizzata una volta sola;
-le chiamate duplicate non arrivano allo screening ne' all'OCR.
+L'analisi e il registro sono separati. `POST /analizza-email` valuta sempre il
+payload e non scrive nel database. Terminata con successo l'azione scelta dal
+flusso, `POST /registra-email` riceve lo stesso payload e lo salva nel registro
+locale. Una seconda registrazione dello stesso messaggio restituisce `202` e
+non avvia OCR.
 
 Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
 prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
@@ -58,6 +60,9 @@ Power Automate (nuova email)  --POST /analizza-email-->  servizio
                                                   |
                     200 se prenotazione certa, altrimenti 202
                         (il verdetto e' nel corpo in entrambi i casi)
+
+Power Automate (azione conclusa) --POST /registra-email--> registro SQLite
+                        (stesso payload, nessuna analisi/OCR)
 ```
 
 Alcune scelte di funzionamento:
@@ -211,16 +216,18 @@ uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --wo
 Documentazione interattiva (generata dal servizio): <http://localhost:8000/docs>.
 
 Il registro e' `data/checked_messages.sqlite3`, creato accanto al servizio e
-ignorato da Git. Contiene localmente il payload originale di ogni messaggio
-ammesso all'analisi, compresi gli eventuali allegati base64: proteggerlo come
-un dato sanitario. Per spostarlo, quando si avvia l'app da Python, passare
+ignorato da Git. `message_key` e' la **primary key**: il controllo dei duplicati
+usa solo quel valore. Contiene localmente il payload originale di ogni messaggio
+registrato dopo la gestione del flusso, compresi gli eventuali allegati base64:
+proteggerlo come un dato sanitario. Per spostarlo, quando si avvia l'app da Python, passare
 `message_store_path=Path(...)` a `create_app`.
 
 ## L'API
 
 | Metodo | Percorso | Descrizione |
 |---|---|---|
-| `POST` | `/analizza-email` | analizza una singola email (richiede `X-API-Key` se configurata) |
+| `POST` | `/analizza-email` | analizza una singola email: non modifica il registro dei messaggi |
+| `POST` | `/registra-email` | registra una email gia' gestita, senza screening o OCR; usa lo stesso payload di analisi |
 | `GET` | `/salute` | sonda di funzionamento, sempre pubblica |
 | `GET` | `/` | informazioni sul servizio |
 | `GET` | `/docs`, `/openapi.json` | documentazione e schema OpenAPI |
@@ -368,10 +375,10 @@ Valori possibili di `esito`:
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
-| `ignorata` | email gia' presente nel registro locale |
+| `ignorata` | email gia' presente nel registro locale (risposta di `/registra-email`) |
 
 Le risposte `ignorata` usano comunque HTTP `202`, per non far ritentare il flow,
-e includono `considerata: false` e `motivo: gia_analizzato`. Le email analizzate normalmente hanno
+e includono `considerata: false` e `motivo: gia_registrato`. Le email analizzate normalmente hanno
 `considerata: true`; usare questo campo nella condizione di Power Automate prima
 di inoltrare o aprire una pratica.
 
@@ -564,6 +571,15 @@ che anche i casi intermedi passino senza revisione umana la abbassa.
      criteri (`telemedicina` + `1501A`).
 4. **Azione conclusiva** a scelta: *Inoltra messaggio*, creazione di un
    elemento in un elenco, notifica in Teams, risposta automatica al paziente.
+5. **Registra messaggio gestito**: solo dopo che l'azione conclusiva e' riuscita,
+   aggiungere una seconda azione HTTP con lo **stesso corpo** dell'analisi:
+   - Metodo: `POST`
+   - URI: `https://<indirizzo-del-servizio>/registra-email`
+   - Intestazioni: `Content-Type: application/json`, `X-API-Key: <SERVICE_API_KEY>`
+
+   La prima chiamata risponde `201` e scrive il messaggio in
+   `data/checked_messages.sqlite3`; le successive rispondono `202` con
+   `motivo: gia_registrato`. L'endpoint non esegue OCR.
 
 Suggerimenti: impostare un **timeout** generoso sull'azione HTTP (l'OCR di un
 PDF di piu' pagine puo' richiedere qualche decina di secondi) e attivare
@@ -679,9 +695,12 @@ finche' l'OCR non ha finito. Un PDF gia' provvisto di testo si risolve in
 millisecondi, una scansione di piu' pagine puo' richiedere decine di secondi.
 Se i volumi crescono conviene aumentare i `--workers` di uvicorn.
 
-**Chiamate ripetute.** Il servizio conserva un registro locale dei messaggi
-gia' analizzati: una seconda chiamata per la stessa email restituisce `202` con
-`motivo: gia_analizzato` e non consuma altra quota OCR.
+**Registro messaggi gestiti.** L'endpoint `/registra-email` conserva localmente
+lo stesso payload ricevuto da `/analizza-email`, ma solo dopo che il flusso ha
+concluso la propria azione. Una seconda registrazione della stessa email
+restituisce `202` con `motivo: gia_registrato`. `/analizza-email` non consulta
+ne' aggiorna questo registro: la registrazione va quindi collocata al termine
+di ogni elaborazione riuscita del flusso.
 
 **Riservatezza.** Gli allegati vengono inviati a un servizio esterno
 (ocr.space) per il riconoscimento del testo: se contengono dati personali o

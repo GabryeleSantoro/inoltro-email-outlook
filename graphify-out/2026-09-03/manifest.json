@@ -48,9 +48,9 @@
     "semantic_hash": "f0959a9a9a00fa996ae03dfa369db1ae"
   },
   "src/inoltro_email/api/app.py": {
-    "mtime": 1788329400.3133917,
-    "seen": 1788331948.2113843,
-    "ast_hash": "9532c7ecb556020268544d9ee47557a8",
+    "mtime": 1788432054.893998,
+    "seen": 1788432188.3068626,
+    "ast_hash": "180a403b5b50544c54adce7ddf92d8a3",
     "semantic_hash": ""
   },
   "src/inoltro_email/api/responses.py": {
@@ -78,10 +78,10 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/inbound.py": {
-    "mtime": 1787301015.7119117,
-    "seen": 1787312106.1176026,
-    "ast_hash": "b1697806e1d91ca8f5702f08e3e966db",
-    "semantic_hash": "b1697806e1d91ca8f5702f08e3e966db"
+    "mtime": 1788423995.7526155,
+    "seen": 1788424046.5117998,
+    "ast_hash": "1983ade45d435d5c7f286089cf29b938",
+    "semantic_hash": ""
   },
   "src/inoltro_email/logging_setup.py": {
     "mtime": 1787301015.7126136,
@@ -156,9 +156,9 @@
     "semantic_hash": "b8c6a7313d4f97373e5cd73534e5c805"
   },
   "tests/test_api.py": {
-    "mtime": 1788329431.2173276,
-    "seen": 1788331948.211404,
-    "ast_hash": "b2c8c73b966b79424cee8b6d72527784",
+    "mtime": 1788432055.8548582,
+    "seen": 1788432188.3068829,
+    "ast_hash": "5a9e0896063a4084a3f1579f51e145db",
     "semantic_hash": ""
   },
   "tests/test_cli.py": {
@@ -192,9 +192,9 @@
     "semantic_hash": "34166c16f7fbb86a3e3a4e661ecce48e"
   },
   "tests/test_inbound.py": {
-    "mtime": 1787642783.9640453,
-    "seen": 1787825428.7432854,
-    "ast_hash": "e1e9c0c4af5bde1b81f0363729638ecb",
+    "mtime": 1788423996.9918704,
+    "seen": 1788424046.5118423,
+    "ast_hash": "226d50c8528e8d79de05a7969bcf982f",
     "semantic_hash": ""
   },
   "tests/test_logging_setup.py": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788329401.284363,
-    "seen": 1788331948.2114148,
-    "ast_hash": "39c560a6f1db2694dff56ecd8be8730d",
+    "mtime": 1788432158.7134187,
+    "seen": 1788432188.3068945,
+    "ast_hash": "6f2a711e7b4a91d691c48c7fe449f12c",
     "semantic_hash": ""
   },
   "config.example.yaml": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/message_guard.py": {
-    "mtime": 1788332000.4213746,
-    "seen": 1788332073.87079,
-    "ast_hash": "4e8dc493a5566600583118959941c052",
+    "mtime": 1788432159.4540675,
+    "seen": 1788432188.3068721,
+    "ast_hash": "7f10ce82d4aa0908d01ec4a40cff70f7",
     "semantic_hash": ""
   },
   "src/inoltro_email/session_report.py": {

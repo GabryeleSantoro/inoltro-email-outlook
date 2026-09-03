@@ -1,27 +1,27 @@
 # Graph Report - inoltro-email-outlook  (2026-09-03)
 
 ## Corpus Check
-- 46 files · ~37,762 words
+- 46 files · ~38,189 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 914 nodes · 2306 edges · 35 communities (29 shown, 6 thin omitted)
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 304 edges (avg confidence: 0.95)
+- 917 nodes · 2327 edges · 38 communities (34 shown, 4 thin omitted)
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 309 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `366c42f0`
+- Built from commit: `275a93a2`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- test_api.py
+- Settings
 - TextExtractor
 - matching.py
 - ConfidenceSettings
-- config.py
+- .load
 - loads_tolerant
-- email_payload
+- parse_email
 - riduci_sotto
 - sentiment.py
 - analysis.py
@@ -29,17 +29,16 @@
 - trova_termini
 - POST /analizza-email - main analysis endpoint
 - inbound.py
-- OcrSpaceClient
+- config.py
 - popup_clicker.py
 - __main__.py
 - _TolerantParser
-- Settings
+- ConfidenceScore
 - app.py
-- .ensure_directories
+- ._closes_string
 - LocalMessageStore
 - InboundEmail
 - models.py
-- .repairs
 - EmailAnalysis
 - Certainty threshold - determines 200 vs 202 response
 - plugin
@@ -48,32 +47,36 @@
 - AGENTS.md - graphify instructions
 - inoltro-email-outlook
 - inspect_popup.py
-- test_email_fuori_tema_letta_comunque
-- ConfidenceScore
+- _parse_html_body
+- _BodyParser
+- ScreeningReport
+- InboundAttachment
+- _cmd_analizza
+- _read_path_attachments
 
 ## God Nodes (most connected - your core abstractions)
-1. `Settings` - 96 edges
-2. `email_payload()` - 69 edges
-3. `TextExtractor` - 53 edges
-4. `attachment_payload()` - 52 edges
-5. `FakeOcrClient` - 46 edges
-6. `EmailAnalyzer` - 45 edges
-7. `parse_email()` - 44 edges
-8. `make_blank_pdf()` - 36 edges
+1. `Settings` - 98 edges
+2. `email_payload()` - 71 edges
+3. `TextExtractor` - 54 edges
+4. `attachment_payload()` - 54 edges
+5. `FakeOcrClient` - 47 edges
+6. `EmailAnalyzer` - 46 edges
+7. `parse_email()` - 45 edges
+8. `make_blank_pdf()` - 37 edges
 9. `create_app()` - 33 edges
 10. `analizza()` - 30 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `analizza()` --uses--> `EmailAnalyzer`  [INFERRED]
-  tests/test_analysis.py → src/inoltro_email/analysis.py
-- `test_allegato_illeggibile_non_blocca_la_risposta()` --uses--> `EmailAnalyzer`  [INFERRED]
-  tests/test_analysis.py → src/inoltro_email/analysis.py
 - `settings()` --uses--> `ScreeningSettings`  [INFERRED]
   tests/conftest.py → src/inoltro_email/config.py
 - `settings()` --uses--> `RuleSettings`  [INFERRED]
   tests/conftest.py → src/inoltro_email/config.py
-- `settings()` --uses--> `OcrSettings`  [INFERRED]
+- `settings()` --uses--> `SentimentSettings`  [INFERRED]
   tests/conftest.py → src/inoltro_email/config.py
+- `settings()` --uses--> `Settings`  [INFERRED]
+  tests/conftest.py → src/inoltro_email/config.py
+- `test_ambiente_ha_la_precedenza()` --uses--> `Settings`  [INFERRED]
+  tests/test_config.py → src/inoltro_email/config.py
 
 ## Import Cycles
 - None detected.
@@ -83,15 +86,15 @@
 - **Production runtime dependencies** — concept_fastapi, concept_uvicorn, concept_pypdf, concept_pillow [EXTRACTED 1.00]
 - **Design rationale decisions explaining service behavior** — concept_json_repair, concept_read_all_then_decide, concept_pdf_text_first, concept_ocr_noise_tolerance, concept_image_resize, concept_telemarketing_vs_booking, concept_dual_2xx_codes [INFERRED 0.85]
 
-## Communities (35 total, 6 thin omitted)
+## Communities (38 total, 4 thin omitted)
 
-### Community 0 - "test_api.py"
-Cohesion: 0.08
-Nodes (56): LogCaptureFixture, EmailAnalyzer, Applica screening, OCR, criteri e sentiment a una singola email., create_app(), Path, Costruisce l'applicazione. ``analyzer`` si passa solo nei test, per evitare…, TestClient, client() (+48 more)
+### Community 0 - "Settings"
+Cohesion: 0.06
+Nodes (117): LogCaptureFixture, EmailAnalyzer, Applica screening, OCR, criteri e sentiment a una singola email., create_app(), Path, Costruisce l'applicazione. ``analyzer`` si passa solo nei test, per evitare…, Crea la cartella dei log: il primo avvio non fallisce., Settings (+109 more)
 
 ### Community 1 - "TextExtractor"
 Cohesion: 0.10
-Nodes (40): AttachmentFile, ExtractedText, Allegato salvato su disco, pronto per essere analizzato., Testo ricavato da un allegato, con la provenienza e l'eventuale errore., Da dove arriva il testo di un allegato., TextSource, Path, Estrazione del testo da un allegato. Si legge sempre il modo piu' diretto per… (+32 more)
+Nodes (39): AttachmentFile, ExtractedText, Allegato salvato su disco, pronto per essere analizzato., Testo ricavato da un allegato, con la provenienza e l'eventuale errore., Da dove arriva il testo di un allegato., TextSource, Path, Estrazione del testo da un allegato. Si legge sempre il modo piu' diretto per… (+31 more)
 
 ### Community 2 - "matching.py"
 Cohesion: 0.09
@@ -99,19 +102,19 @@ Nodes (42): Solo il testo leggibile: via gli indirizzi e le righe di instradamen
 
 ### Community 3 - "ConfidenceSettings"
 Cohesion: 0.06
-Nodes (56): Match, _Accumulator, _apply_context(), _build(), _cerca_nel_testo(), _etichetta(), _find_markers(), level_for() (+48 more)
+Nodes (54): Match, _Accumulator, _apply_context(), _build(), _cerca_nel_testo(), _etichetta(), _find_markers(), level_for() (+46 more)
 
-### Community 4 - "config.py"
-Cohesion: 0.09
-Nodes (53): ApiSettings, _as_str_list(), AttachmentSettings, _clean(), ConfigError, FlowPopupSettings, LoggingSettings, _normalize_extension() (+45 more)
+### Community 4 - ".load"
+Cohesion: 0.18
+Nodes (33): ConfigError, Exception, Legge il YAML, unisce i segreti dall'ambiente e valida il tutto.…, Sovrascrive con l'ambiente cio' che non deve stare nel YAML., Configurazione assente, malformata o incoerente., ambiente_pulito(), fixture, MonkeyPatch (+25 more)
 
 ### Community 5 - "loads_tolerant"
 Cohesion: 0.12
 Nodes (25): _as_text(), _has_content(), loads_tolerant(), ValueError, Lettura tollerante del JSON inviato da Power Automate. Il flusso costruisce il…, Il payload non e' interpretabile nemmeno con le riparazioni., Interpreta ``raw`` restituendo ``(valore, riparazioni)``. ``riparazioni`` e'…, RawJsonError (+17 more)
 
-### Community 6 - "email_payload"
-Cohesion: 0.09
-Nodes (42): LocalFileSettings, Allegati passati come percorso su disco invece che in base64. Il flusso Power…, parse_email(), Costruisce un ``InboundEmail`` dal JSON ricevuto da Power Automate.…, b64(), email_payload(), Any, Fixture condivise: configurazione di prova, OCR fittizio, payload di esempio. (+34 more)
+### Community 6 - "parse_email"
+Cohesion: 0.10
+Nodes (33): LocalFileSettings, Allegati passati come percorso su disco invece che in base64. Il flusso Power…, parse_email(), Costruisce un ``InboundEmail`` dal JSON ricevuto da Power Automate.…, b64(), Fixture condivise: configurazione di prova, OCR fittizio, payload di esempio., Test della lettura del payload inviato da Power Automate., La foto incollata nel corpo arriva come <img src="data:...">. (+25 more)
 
 ### Community 7 - "riduci_sotto"
 Cohesion: 0.12
@@ -138,12 +141,12 @@ Cohesion: 0.10
 Nodes (26): Code 1501A - telemedicine booking code, POST /analizza-email - main analysis endpoint, GET /salute - health check endpoint, Confidence scores - telemedicina and booking percentages, FastAPI - HTTP framework, Image resize - downscale oversized images instead of skipping, JSON repair - tolerant parsing of malformed payloads, Local files - disk-path attachment reading (+18 more)
 
 ### Community 13 - "inbound.py"
-Cohesion: 0.06
-Nodes (43): HTMLParser, _as_text(), _BodyParser, _CaseInsensitive, _clean_text(), decode_base64(), _ensure_name(), _flatten() (+35 more)
+Cohesion: 0.16
+Nodes (22): _as_text(), _CaseInsensitive, decode_base64(), _ensure_name(), _flatten(), _from_data_uri(), _is_html_flagged(), _is_inline() (+14 more)
 
-### Community 14 - "OcrSpaceClient"
-Cohesion: 0.08
-Nodes (35): Session, OcrSettings, OcrResult, Risposta di ocr.space per un singolo file., Lettura del testo degli allegati (ocr.space + livello testo dei PDF)., _error_message(), OcrSpaceClient, OcrSpaceError (+27 more)
+### Community 14 - "config.py"
+Cohesion: 0.05
+Nodes (54): Session, ApiSettings, _as_str_list(), AttachmentSettings, _clean(), FlowPopupSettings, LoggingSettings, _normalize_extension() (+46 more)
 
 ### Community 15 - "popup_clicker.py"
 Cohesion: 0.07
@@ -151,27 +154,27 @@ Nodes (30): FlowRunner, Path, Esecuzione periodica di un flusso Power Automate. 
 
 ### Community 16 - "__main__.py"
 Cohesion: 0.07
-Nodes (46): datetime, Avvio rapido del servizio: ``python main.py``. Equivalente a ``python -m…, build(), _configure_reload_worker_logging(), Path, Avvio del servizio con uvicorn. Separato da ``app.py`` cosi' l'applicazione…, Fa scrivere il worker ricaricato nello stesso log della sessione CLI., Fabbrica per ``uvicorn --factory``: legge la configurazione da sola. (+38 more)
+Nodes (44): datetime, Avvio rapido del servizio: ``python main.py``. Equivalente a ``python -m…, build(), _configure_reload_worker_logging(), Path, Avvio del servizio con uvicorn. Separato da ``app.py`` cosi' l'applicazione…, Fa scrivere il worker ricaricato nello stesso log della sessione CLI., Fabbrica per ``uvicorn --factory``: legge la configurazione da sola. (+36 more)
 
 ### Community 17 - "_TolerantParser"
-Cohesion: 0.21
-Nodes (9): _as_list(), Any, Parser a discesa ricorsiva che non si ferma davanti agli errori tipici. Le…, Legge una chiave, oppure restituisce None senza consumare nulla. Serve a…, Numeri, ``true``/``false``/``null`` e valori scritti senza virgolette., La virgoletta corrente chiude davvero la stringa?, Legge una sequenza di escape, tollerando quelle inesistenti., Primo carattere non bianco da ``start``, con la sua posizione. (+1 more)
+Cohesion: 0.24
+Nodes (8): _as_list(), Any, Parser a discesa ricorsiva che non si ferma davanti agli errori tipici. Le…, Riparazioni applicate, con il numero di occorrenze., Legge una chiave, oppure restituisce None senza consumare nulla. Serve a…, Numeri, ``true``/``false``/``null`` e valori scritti senza virgolette., Legge una sequenza di escape, tollerando quelle inesistenti., _TolerantParser
 
-### Community 18 - "Settings"
-Cohesion: 0.14
-Nodes (46): Settings, Esito, Esito complessivo dell'analisi di un messaggio., attachment_payload(), make_blank_pdf(), PDF senza alcun testo: simula una scansione da mandare all'OCR., Allegato nella forma prodotta dal connettore Office 365 Outlook., analizza() (+38 more)
+### Community 18 - "ConfidenceScore"
+Cohesion: 0.20
+Nodes (7): _describe(), La prenotazione e' certa, non solo probabile. Serve il tema confermato *e* una…, Indizi del punteggio in una riga, per il log., ConfidenceScore, Evidence, Un singolo indizio che sposta la percentuale di sicurezza. ``weight`` e'…, Quanto il servizio e' sicuro di un'affermazione, in percentuale.
 
 ### Community 19 - "app.py"
 Cohesion: 0.11
-Nodes (18): FastAPI, Request, _check_api_key(), _constant_time_equals(), _ignored_message(), _payload_to_log(), _payload_value(), Any (+10 more)
+Nodes (20): FastAPI, Request, _check_api_key(), _constant_time_equals(), _ignored_message(), _payload_to_log(), _payload_value(), Any (+12 more)
 
 ### Community 21 - "LocalMessageStore"
-Cohesion: 0.18
-Nodes (10): Connection, LocalMessageStore, message_fingerprint(), Any, Path, Controlli locali, economici, prima dell'analisi di una email. Il database resta…, Registro SQLite persistente e sicuro anche con piu' worker., Salva il messaggio e lo riserva all'analisi. L'inserimento atomico e' anche il… (+2 more)
+Cohesion: 0.19
+Nodes (9): Connection, LocalMessageStore, message_fingerprint(), Any, Path, Registro locale dei messaggi che il flusso ha gia' gestito. Il database resta…, Registro SQLite persistente e sicuro anche con piu' worker., Registra il messaggio; ``False`` se la stessa impronta esiste gia'. (+1 more)
 
 ### Community 22 - "InboundEmail"
-Cohesion: 0.17
-Nodes (7): Logga il contenuto in ingresso per facilitare il debug del flusso., Gli allegati da analizzare: solo PDF e immagini, entro i limiti. Cio' che non…, Analizza il messaggio e restituisce il verdetto completo. Non solleva mai: un…, InboundEmail, Identificativo usato nei log e nella risposta., Oggetto e corpo insieme: e' cio' su cui si fa la prima verifica., Email singola inviata dal flusso Power Automate. ``body_text`` e' sempre testo…
+Cohesion: 0.20
+Nodes (6): Logga il contenuto in ingresso per facilitare il debug del flusso., Analizza il messaggio e restituisce il verdetto completo. Non solleva mai: un…, InboundEmail, Identificativo usato nei log e nella risposta., Oggetto e corpo insieme: e' cio' su cui si fa la prima verifica., Email singola inviata dal flusso Power Automate. ``body_text`` e' sempre testo…
 
 ### Community 23 - "models.py"
 Cohesion: 0.40
@@ -197,29 +200,49 @@ Nodes (14): analysis_to_dict(), _clip(), confidence_to_dict(), _criteria_to_dict
 Cohesion: 0.50
 Nodes (4): _dump_element(), main(), Diagnostic: dump the UIA tree of the Power Automate popup. Run this while the…, Recursive dump of a UIA element and its children.
 
-### Community 36 - "ConfidenceScore"
-Cohesion: 0.15
-Nodes (9): _describe(), Motivo per non leggere gli allegati, oppure None per proseguire., La prenotazione e' certa, non solo probabile. Serve il tema confermato *e* una…, Indizi del punteggio in una riga, per il log., ConfidenceScore, Prima verifica: telemedicina/televisita nell'oggetto o nel corpo., Termini riconosciuti, senza ripetizioni e in ordine stabile., Quanto il servizio e' sicuro di un'affermazione, in percentuale. (+1 more)
+### Community 34 - "_parse_html_body"
+Cohesion: 0.33
+Nodes (6): _clean_text(), html_to_text(), _parse_html_body(), Riduce l'HTML del corpo a testo semplice, mantenendo gli a capo., Normalizza spazi e a capo: il testo va poi a regole e sentiment., test_html_to_text_mantiene_gli_a_capo()
+
+### Community 35 - "_BodyParser"
+Cohesion: 0.22
+Nodes (3): HTMLParser, _BodyParser, Estrae testo e sorgenti delle immagini da un corpo HTML.
+
+### Community 36 - "ScreeningReport"
+Cohesion: 0.29
+Nodes (4): Motivo per non leggere gli allegati, oppure None per proseguire., Prima verifica: telemedicina/televisita nell'oggetto o nel corpo., Termini riconosciuti, senza ripetizioni e in ordine stabile., ScreeningReport
+
+### Community 38 - "InboundAttachment"
+Cohesion: 0.25
+Nodes (4): Gli allegati da analizzare: solo PDF e immagini, entro i limiti. Cio' che non…, InboundAttachment, Allegato ricevuto da Power Automate. Arriva in due forme, entrambe supportate:…, C'e' qualcosa da leggere: byte in memoria o un file raggiungibile.
+
+### Community 39 - "_cmd_analizza"
+Cohesion: 0.29
+Nodes (7): InboundError, ValueError, Payload non interpretabile: manca un campo o il base64 e' rotto., _cmd_analizza(), Analizza un payload salvato su file: stessa risposta dell'endpoint HTTP., test_email_vuota_rifiutata(), test_payload_non_oggetto_rifiutato()
+
+### Community 40 - "_read_path_attachments"
+Cohesion: 0.40
+Nodes (6): _inside_any(), Path, Legge gli allegati che il payload indica solo con il percorso su disco., Trova il file indicato dal payload; ``(None, motivo)`` se non ci riesce. Il…, _read_path_attachments(), _resolve_local_path()
 
 ## Knowledge Gaps
 - **11 isolated node(s):** `$schema`, `.opencode/plugins/graphify.js`, `opencode-mem`, `inoltro-email-outlook`, `Code 1501A - telemedicine booking code` (+6 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Settings` connect `Settings` to `test_api.py`, `TextExtractor`, `config.py`, `analysis.py`, `main`, `OcrSpaceClient`, `__main__.py`, `app.py`, `.ensure_directories`?**
-  _High betweenness centrality (0.130) - this node is a cross-community bridge._
-- **Why does `loads_tolerant()` connect `loads_tolerant` to `__main__.py`, `_TolerantParser`, `app.py`?**
+- **Why does `Settings` connect `Settings` to `TextExtractor`, `.load`, `_cmd_analizza`, `analysis.py`, `main`, `config.py`, `__main__.py`, `app.py`?**
+  _High betweenness centrality (0.133) - this node is a cross-community bridge._
+- **Why does `loads_tolerant()` connect `loads_tolerant` to `__main__.py`, `_TolerantParser`, `app.py`, `_cmd_analizza`?**
   _High betweenness centrality (0.062) - this node is a cross-community bridge._
-- **Why does `parse_email()` connect `email_payload` to `test_api.py`, `inbound.py`, `__main__.py`, `Settings`, `app.py`, `InboundEmail`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
-- **Are the 80 inferred relationships involving `Settings` (e.g. with `EmailAnalyzer` and `_cmd_analizza()`) actually correct?**
-  _`Settings` has 80 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 34 inferred relationships involving `TextExtractor` (e.g. with `ImageError` and `OcrSpaceClient`) actually correct?**
-  _`TextExtractor` has 34 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 15 inferred relationships involving `FakeOcrClient` (e.g. with `OcrResult` and `client()`) actually correct?**
-  _`FakeOcrClient` has 15 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `parse_email()` connect `parse_email` to `Settings`, `_parse_html_body`, `_cmd_analizza`, `_read_path_attachments`, `inbound.py`, `__main__.py`, `app.py`, `InboundEmail`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+- **Are the 81 inferred relationships involving `Settings` (e.g. with `EmailAnalyzer` and `_cmd_analizza()`) actually correct?**
+  _`Settings` has 81 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 35 inferred relationships involving `TextExtractor` (e.g. with `ImageError` and `OcrSpaceClient`) actually correct?**
+  _`TextExtractor` has 35 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 16 inferred relationships involving `FakeOcrClient` (e.g. with `OcrResult` and `client()`) actually correct?**
+  _`FakeOcrClient` has 16 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `$schema`, `.opencode/plugins/graphify.js`, `opencode-mem` to the rest of the system?**
   _11 weakly-connected nodes found - possible documentation gaps or missing edges._
