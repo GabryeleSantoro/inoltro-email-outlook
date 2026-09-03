@@ -8,7 +8,8 @@ e Microsoft Graph, quindi qui si accettano entrambe le forme:
     subject / Subject
     body / bodyHtml / bodyContent / bodyPreview, come stringa o {content, contentType}
     from  come stringa oppure {emailAddress: {address}}
-    attachments[*].contentBytes / content / contentBase64 (base64)
+    attachments[*].contentBytes / content / contentBase64 (base64), anche
+    quando Power Automate Desktop annida l'allegato in ``Properties``
 
 Le foto incorporate nel corpo arrivano in due modi diversi e vengono
 riconosciute entrambe: come allegati con ``isInline: true`` e come immagini
@@ -287,6 +288,15 @@ def _read_attachments(
             logger.warning("Allegato %d ignorato: non e' un oggetto JSON.", index)
             continue
         entry = _CaseInsensitive(item)
+
+        # Il connettore Office 365 Outlook, quando l'oggetto viene passato da
+        # Power Automate Desktop, puo' serializzarlo come
+        # {"Properties": {"name": ..., "contentBytes": ...}, "TypeId": ...}.
+        # Il formato Graph diretto non ha questo involucro. Si accettano
+        # entrambi senza cambiare il flusso chiamante.
+        nested_properties = entry.get("properties")
+        if isinstance(nested_properties, Mapping):
+            entry = _CaseInsensitive(nested_properties)
 
         content_b64 = ""
         for key in ("contentBytes", "content", "contentBase64", "$content"):

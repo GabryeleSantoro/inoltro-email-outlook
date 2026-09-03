@@ -86,6 +86,29 @@ def test_allegato_inline_marcato_come_foto_del_corpo() -> None:
     assert email.attachments[0].origine is Origine.CORPO
 
 
+def test_allegati_office365_desktop_annidati_in_properties() -> None:
+    """PAD serializza gli oggetti del connettore in ``Properties``."""
+    payload = email_payload(attachments=[
+        {
+            "Properties": attachment_payload("impegnativa.pdf", b"%PDF"),
+            "TypeId": None,
+        },
+        {
+            "Properties": attachment_payload(
+                "image001.jpg", b"jpeg", content_type="image/jpeg", inline=True,
+            ),
+            "TypeId": None,
+        },
+    ])
+
+    email = parse_email(payload)
+
+    assert [(item.name, item.content, item.origine) for item in email.attachments] == [
+        ("impegnativa.pdf", b"%PDF", Origine.ALLEGATO),
+        ("image001.jpg", b"jpeg", Origine.CORPO),
+    ]
+
+
 def test_foto_inline_escluse_su_richiesta() -> None:
     payload = email_payload(attachments=[
         attachment_payload("foto.jpg", b"jpeg", content_type="image/jpeg", inline=True),

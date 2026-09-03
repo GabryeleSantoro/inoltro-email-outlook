@@ -46,6 +46,16 @@ def test_confusioni_ocr_attive_per_default() -> None:
     assert evaluate("telemedicina prestazione l5O1A", RuleSettings()).matched
 
 
+@pytest.mark.parametrize("text", ["telemedicina su un'isola", "telemedicina in aree isolate"])
+def test_isola_non_diventa_mai_il_codice_1501a(text: str) -> None:
+    """Evita il falso positivo reale: isola -> 1501A con le confusioni OCR."""
+    assert not evaluate(text, RuleSettings()).matched
+
+
+def test_esclusione_isola_non_blocca_un_vero_codice_ocr() -> None:
+    assert evaluate("telemedicina isola: prestazione l5O1A", RuleSettings()).matched
+
+
 def test_confusioni_ocr_disattivabili() -> None:
     rules = RuleSettings(fuzzy_ocr_confusions=False)
     assert not evaluate("telemedicina prestazione l5O1A", rules).matched

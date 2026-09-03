@@ -27,6 +27,11 @@ from .models import MatchReport, ScreeningReport
 # parola come "televisita" trasformerebbero le lettere in cifre senza motivo.
 OCR_CONFUSIONS = str.maketrans({"o": "0", "i": "1", "l": "1", "s": "5", "b": "8"})
 
+# Sequenze di testo normale che, dopo le sole confusioni OCR consentite,
+# diventano un codice. Sono escluse soltanto dalla ricerca tollerante: un
+# codice scritto esattamente continua a essere valido.
+_OCR_FALSE_CODE_SEQUENCES = {"isola": "1501a"}
+
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _WHITESPACE = re.compile(r"\s+")
 
@@ -69,7 +74,12 @@ def contains_code(haystack_collapsed: str, code: str, fuzzy: bool) -> bool:
         return False
     # Stessa normalizzazione su entrambi i lati: cosi' "l5A1O" letto dall'OCR
     # e il codice atteso "1501A" convergono sulla stessa stringa.
-    return apply_ocr_confusions(needle) in apply_ocr_confusions(haystack_collapsed)
+    fuzzy_needle = apply_ocr_confusions(needle)
+    fuzzy_haystack = haystack_collapsed
+    for sequence, false_code in _OCR_FALSE_CODE_SEQUENCES.items():
+        if false_code == fuzzy_needle:
+            fuzzy_haystack = fuzzy_haystack.replace(sequence, "")
+    return fuzzy_needle in apply_ocr_confusions(fuzzy_haystack)
 
 
 def evaluate(text: str, rules: RuleSettings) -> MatchReport:
