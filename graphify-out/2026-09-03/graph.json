@@ -3360,7 +3360,7 @@
       "file_type": "code",
       "norm_label": "_binary_hash()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L124"
+      "source_location": "L127"
     },
     {
       "id": "src_inoltro_email_message_guard_body_text",
@@ -3384,7 +3384,7 @@
       "file_type": "code",
       "norm_label": "_create_current_table()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L161"
+      "source_location": "L164"
     },
     {
       "id": "src_inoltro_email_message_guard_ensure_schema",
@@ -3396,7 +3396,7 @@
       "file_type": "code",
       "norm_label": "_ensure_schema()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L134"
+      "source_location": "L137"
     },
     {
       "id": "src_inoltro_email_message_guard_localmessagestore_connect",
@@ -3468,7 +3468,7 @@
       "file_type": "code",
       "norm_label": "_normalize()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L130"
+      "source_location": "L133"
     },
     {
       "id": "src_inoltro_email_message_guard_rebuild_table",
@@ -3480,7 +3480,7 @@
       "file_type": "code",
       "norm_label": "_rebuild_table()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L175"
+      "source_location": "L178"
     },
     {
       "id": "src_inoltro_email_message_guard_sender_identity",
@@ -3504,7 +3504,7 @@
       "file_type": "code",
       "norm_label": "_stored_fingerprint()",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L208"
+      "source_location": "L211"
     },
     {
       "id": "src_inoltro_email_message_guard_value",
@@ -8359,7 +8359,7 @@
       "source_location": "L1"
     },
     {
-      "id": "src_inoltro_email_message_guard_rationale_135",
+      "id": "src_inoltro_email_message_guard_rationale_138",
       "label": "Crea/migra schema e ricalcola impronte quando cambia l'algoritmo.",
       "_origin": "ast",
       "community": 21,
@@ -8367,10 +8367,10 @@
       "file_type": "rationale",
       "norm_label": "crea/migra schema e ricalcola impronte quando cambia l'algoritmo.",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L135"
+      "source_location": "L138"
     },
     {
-      "id": "src_inoltro_email_message_guard_rationale_176",
+      "id": "src_inoltro_email_message_guard_rationale_179",
       "label": "Conserva ultima registrazione per ogni nuova firma di contenuto.",
       "_origin": "ast",
       "community": 21,
@@ -8378,7 +8378,7 @@
       "file_type": "rationale",
       "norm_label": "conserva ultima registrazione per ogni nuova firma di contenuto.",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L176"
+      "source_location": "L179"
     },
     {
       "id": "src_inoltro_email_message_guard_rationale_23",
@@ -13344,7 +13344,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L118",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -13356,7 +13356,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L119",
+      "source_location": "L122",
       "weight": 1.0
     },
     {
@@ -13404,7 +13404,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L138",
+      "source_location": "L141",
       "weight": 1.0
     },
     {
@@ -13416,7 +13416,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L140",
+      "source_location": "L143",
       "weight": 1.0
     },
     {
@@ -13560,7 +13560,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L202",
+      "source_location": "L205",
       "weight": 1.0
     },
     {
@@ -13596,7 +13596,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L214",
+      "source_location": "L217",
       "weight": 1.0
     },
     {
@@ -23916,7 +23916,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L124",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -23940,7 +23940,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L161",
+      "source_location": "L164",
       "weight": 1.0
     },
     {
@@ -23952,7 +23952,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L134",
+      "source_location": "L137",
       "weight": 1.0
     },
     {
@@ -23976,7 +23976,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L130",
+      "source_location": "L133",
       "weight": 1.0
     },
     {
@@ -23988,7 +23988,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L175",
+      "source_location": "L178",
       "weight": 1.0
     },
     {
@@ -26968,7 +26968,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L124",
+      "source_location": "L127",
       "weight": 1.0
     },
     {
@@ -26979,7 +26979,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L130",
+      "source_location": "L133",
       "weight": 1.0
     },
     {
@@ -26990,7 +26990,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L134",
+      "source_location": "L137",
       "weight": 1.0
     },
     {
@@ -27001,7 +27001,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L161",
+      "source_location": "L164",
       "weight": 1.0
     },
     {
@@ -27012,7 +27012,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L175",
+      "source_location": "L178",
       "weight": 1.0
     },
     {
@@ -27023,7 +27023,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L208",
+      "source_location": "L211",
       "weight": 1.0
     },
     {
@@ -32747,25 +32747,25 @@
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_message_guard_rationale_135",
+      "source": "src_inoltro_email_message_guard_rationale_138",
       "target": "src_inoltro_email_message_guard_ensure_schema",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L135",
+      "source_location": "L138",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_message_guard_rationale_176",
+      "source": "src_inoltro_email_message_guard_rationale_179",
       "target": "src_inoltro_email_message_guard_rebuild_table",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/message_guard.py",
-      "source_location": "L176",
+      "source_location": "L179",
       "weight": 1.0
     },
     {

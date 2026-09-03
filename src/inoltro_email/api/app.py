@@ -1,8 +1,9 @@
 """Applicazione HTTP (FastAPI) interrogata da Power Automate.
 
 ``POST /analizza-email`` riceve una singola email in JSON e restituisce il
-verdetto. ``POST /registra-email`` riceve lo stesso payload, ma registra solo
-che il flusso ha gia' gestito il messaggio: non avvia screening ne' OCR.
+verdetto, ma salta screening e OCR se il messaggio e' gia' nel registro.
+``POST /registra-email`` riceve lo stesso payload, ma registra solo che il
+flusso ha gia' gestito il messaggio.
 
 Il client verso ocr.space viene creato una volta sola all'avvio e chiuso allo
 spegnimento: cosi' la connessione TLS si riusa fra una richiesta e l'altra.
@@ -257,13 +258,23 @@ def create_app(
         x_api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER),
     ) -> JSONResponse:
         _check_api_key(settings, x_api_key)
-        email, _payload, repairs = await _read_email_request(request, settings)
+        email, payload, repairs = await _read_email_request(request, settings)
 
         if repairs:
             # Il payload e' stato accettato ma era da riparare: chi legge la
             # risposta deve poterlo sapere e correggere il flusso a monte.
             email.warnings.append(
                 "JSON non valido riparato in lettura: " + "; ".join(repairs)
+            )
+
+        # Il flusso registra il messaggio soltanto dopo aver completato le
+        # proprie azioni. Ai tentativi successivi il controllo deve stare qui,
+        # prima dell'OCR e prima di qualunque risposta 200.
+        if request.app.state.message_store.contains(payload):
+            logger.info("Email gia' analizzata: %s. OCR non avviato.", email.key)
+            return JSONResponse(
+                _ignored_message(email.key, email.subject, "gia_analizzata"),
+                status_code=MESSAGGIO_IGNORATO,
             )
 
         logger.info(

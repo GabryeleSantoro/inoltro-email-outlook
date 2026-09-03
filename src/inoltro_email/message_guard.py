@@ -49,6 +49,15 @@ class LocalMessageStore:
             )
         return cursor.rowcount == 1
 
+    def contains(self, payload: Mapping[str, Any]) -> bool:
+        """Restituisce ``True`` se il messaggio e' gia' stato registrato."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM checked_messages WHERE fingerprint = ? LIMIT 1",
+                (message_fingerprint(payload),),
+            ).fetchone()
+        return row is not None
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=10)
 

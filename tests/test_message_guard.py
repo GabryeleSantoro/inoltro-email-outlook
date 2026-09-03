@@ -37,6 +37,7 @@ def test_registro_blocca_contenuto_uguale_con_id_diversi(tmp_path) -> None:
     second = {"id": "AAMk-dopo", "subject": "Televisita", "body": "Richiesta"}
 
     assert store.register(InboundEmail(message_id="AAMk-prima"), first) is True
+    assert store.contains(second) is True
     assert store.register(InboundEmail(message_id="AAMk-dopo"), second) is False
 
 

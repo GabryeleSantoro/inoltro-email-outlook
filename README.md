@@ -17,11 +17,11 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
    determinate;
 4. calcola un **punteggio di sentiment** del messaggio.
 
-L'analisi e il registro sono separati. `POST /analizza-email` valuta sempre il
-payload e non scrive nel database. Terminata con successo l'azione scelta dal
-flusso, `POST /registra-email` riceve lo stesso payload e lo salva nel registro
-locale. Una seconda registrazione dello stesso messaggio restituisce `202` e
-non avvia OCR.
+L'analisi e il registro sono separati. `POST /analizza-email` consulta prima il
+registro: se trova lo stesso messaggio restituisce `202` e non avvia screening
+ne' OCR. Per una mail nuova valuta il payload, ma non scrive nel database.
+Terminata con successo l'azione scelta dal flusso, `POST /registra-email` riceve
+lo stesso payload e lo salva nel registro locale.
 
 Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
 prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
@@ -34,7 +34,12 @@ risponde.
 ## Come funziona
 
 ```
-Power Automate (nuova email)  --POST /analizza-email-->  servizio
+Power Automate (nuova email)  --POST /analizza-email-->  registro SQLite
+                                                            |
+                                             gia' registrata? --si--> 202, niente OCR
+                                                            | no
+                                                            v
+                                                         servizio
                                                             |
                                             oggetto + corpo: telemedicina/televisita?
                                                             |
@@ -228,7 +233,7 @@ proteggerlo come un dato sanitario. Per spostarlo, quando si avvia l'app da Pyth
 
 | Metodo | Percorso | Descrizione |
 |---|---|---|
-| `POST` | `/analizza-email` | analizza una singola email: non modifica il registro dei messaggi |
+| `POST` | `/analizza-email` | analizza una singola email nuova; se gia' registrata restituisce `202` senza OCR e non modifica il registro |
 | `POST` | `/registra-email` | registra una email gia' gestita, senza screening o OCR; usa lo stesso payload di analisi |
 | `GET` | `/salute` | sonda di funzionamento, sempre pubblica |
 | `GET` | `/` | informazioni sul servizio |
@@ -377,12 +382,13 @@ Valori possibili di `esito`:
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
 | `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
-| `ignorata` | email gia' presente nel registro locale (risposta di `/registra-email`) |
+| `ignorata` | email gia' presente nel registro locale (risposta di `/analizza-email` o `/registra-email`) |
 
 Le risposte `ignorata` usano comunque HTTP `202`, per non far ritentare il flow,
-e includono `considerata: false` e `motivo: gia_registrato`. Le email analizzate normalmente hanno
-`considerata: true`; usare questo campo nella condizione di Power Automate prima
-di inoltrare o aprire una pratica.
+e includono `considerata: false` e `motivo: gia_analizzata` (oppure
+`gia_registrato` se arriva direttamente a `/registra-email`). Le email analizzate
+normalmente hanno `considerata: true`; usare questo campo nella condizione di
+Power Automate prima di inoltrare o aprire una pratica.
 
 ### I documenti letti
 
@@ -581,7 +587,8 @@ che anche i casi intermedi passino senza revisione umana la abbassa.
 
    La prima chiamata risponde `201` e scrive il messaggio in
    `data/checked_messages.sqlite3`; le successive rispondono `202` con
-   `motivo: gia_registrato`. L'endpoint non esegue OCR.
+   `motivo: gia_registrato`. Le chiamate successive a `/analizza-email` con
+   quel payload rispondono `202` con `motivo: gia_analizzata`, senza OCR.
 
 Suggerimenti: impostare un **timeout** generoso sull'azione HTTP (l'OCR di un
 PDF di piu' pagine puo' richiedere qualche decina di secondi) e attivare
@@ -700,9 +707,10 @@ Se i volumi crescono conviene aumentare i `--workers` di uvicorn.
 **Registro messaggi gestiti.** L'endpoint `/registra-email` conserva localmente
 lo stesso payload ricevuto da `/analizza-email`, ma solo dopo che il flusso ha
 concluso la propria azione. Una seconda registrazione della stessa email
-restituisce `202` con `motivo: gia_registrato`. `/analizza-email` non consulta
-ne' aggiorna questo registro: la registrazione va quindi collocata al termine
-di ogni elaborazione riuscita del flusso.
+restituisce `202` con `motivo: gia_registrato`. `/analizza-email` consulta il
+registro prima dell'analisi: una mail gia' registrata restituisce `202` con
+`motivo: gia_analizzata`, senza OCR. La registrazione resta al termine di ogni
+elaborazione riuscita del flusso.
 
 **Riservatezza.** Gli allegati vengono inviati a un servizio esterno
 (ocr.space) per il riconoscimento del testo: se contengono dati personali o

@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/message_guard.py": {
-    "mtime": 1788435606.7249439,
-    "seen": 1788435714.4973834,
-    "ast_hash": "0231a7304a4758b4f2ca2866fbf76f70",
+    "mtime": 1788435726.876707,
+    "seen": 1788435827.8249247,
+    "ast_hash": "bf2461c0762a61cef6cdd5fe05c0dd9d",
     "semantic_hash": ""
   },
   "src/inoltro_email/session_report.py": {

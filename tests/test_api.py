@@ -107,6 +107,29 @@ def test_email_registrata_non_viene_registrata_due_volte(
     assert stored is not None and '"subject"' in stored[0]
 
 
+def test_email_gia_registrata_non_viene_analizzata(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    """Un doppione non deve mai arrivare all'analizzatore/OCR."""
+    database = tmp_path / "checked.sqlite3"
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+
+    class AnalyzerMustNotRun:
+        def analyze(self, _email):
+            raise AssertionError("un messaggio gia' registrato non va analizzato")
+
+    with TestClient(create_app(
+        settings, analyzer=AnalyzerMustNotRun(), message_store_path=database,
+    )) as instance:
+        assert instance.post("/registra-email", json=payload).status_code == 201
+        risposta = instance.post("/analizza-email", json=payload)
+
+    assert risposta.status_code == 202
+    assert risposta.json()["considerata"] is False
+    assert risposta.json()["motivo"] == "gia_analizzata"
+    assert ocr.calls == []
+
+
 def test_analisi_non_registra_il_messaggio(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
