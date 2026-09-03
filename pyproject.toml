@@ -11,6 +11,7 @@ dependencies = [
     "PyYAML>=6.0",
     "python-dotenv>=1.0",
     "pypdf>=4.0",
+    "Pillow>=10.0",
     "pywinauto>=0.6.8",
 ]
 

@@ -18,9 +18,9 @@
     "semantic_hash": "9bd7b2ef0a1b6f97a072beadf39a3d28"
   },
   "pyproject.toml": {
-    "mtime": 1787642783.9550738,
-    "seen": 1787825428.743142,
-    "ast_hash": "cfce0d3e464d7b56ed7ec2a498e85cc5",
+    "mtime": 1788433131.0335193,
+    "seen": 1788433200.5437062,
+    "ast_hash": "df19c51504347fdfd2443143c70e379e",
     "semantic_hash": ""
   },
   "src/inoltro_email/__init__.py": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788432467.9164643,
-    "seen": 1788432496.0186038,
-    "ast_hash": "2fd707dac3c12a5ff3ec1f36ef796080",
+    "mtime": 1788435702.3863711,
+    "seen": 1788435714.4974124,
+    "ast_hash": "975c1a041fc706c5a156aa7d28782456",
     "semantic_hash": ""
   },
   "config.example.yaml": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/message_guard.py": {
-    "mtime": 1788432449.953146,
-    "seen": 1788432496.018576,
-    "ast_hash": "fc2dd66c707322c063e9ae23cc4bec24",
+    "mtime": 1788435726.876707,
+    "seen": 1788435827.8249247,
+    "ast_hash": "bf2461c0762a61cef6cdd5fe05c0dd9d",
     "semantic_hash": ""
   },
   "src/inoltro_email/session_report.py": {
@@ -294,9 +294,9 @@
     "semantic_hash": ""
   },
   "tests/test_message_guard.py": {
-    "mtime": 1788432468.4862738,
-    "seen": 1788432496.0185976,
-    "ast_hash": "4ae348c5867c459bc0474b48a2034986",
+    "mtime": 1788435626.417804,
+    "seen": 1788435714.4974062,
+    "ast_hash": "fe106b28c6a6585f5a1566a22ea66a21",
     "semantic_hash": ""
   }
 }

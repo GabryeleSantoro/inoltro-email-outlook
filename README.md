@@ -216,8 +216,10 @@ uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --wo
 Documentazione interattiva (generata dal servizio): <http://localhost:8000/docs>.
 
 Il registro e' `data/checked_messages.sqlite3`, creato accanto al servizio e
-ignorato da Git. `message_key` e' la **primary key**: il controllo dei duplicati
-usa solo quel valore. Contiene localmente il payload originale di ogni messaggio
+ignorato da Git. `message_key` resta solo l'ID mostrato nei log; il controllo
+dei duplicati usa mittente, data di ricezione, oggetto e impronta dei file
+(oppure corpo se non ci sono file), ignorando ID, versioni e metadati Outlook
+che cambiano dopo uno spostamento. Contiene localmente il payload originale di ogni messaggio
 registrato dopo la gestione del flusso, compresi gli eventuali allegati base64:
 proteggerlo come un dato sanitario. Per spostarlo, quando si avvia l'app da Python, passare
 `message_store_path=Path(...)` a `create_app`.
