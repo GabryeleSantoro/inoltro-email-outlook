@@ -4,11 +4,10 @@ Quando un flow viene avviato da .lnk, PAD mostra una finestra che chiede
 conferma prima di eseguire. Questo modulo:
 
 1. Cerca la finestra di conferma (titolo configurabile).
-2. Disabilita l'input utente per il minimo tempo necessario (``BlockInput``)
-   cosi' nessun'altra finestra puo' rubare il focus.
-3. Porta la finestra in primo piano e la rende TOPMOST.
-   4. Clicca il pulsante "Continua" (o testo configurabile).
-5. Ripristina input e stato della finestra.
+2. Porta la finestra in primo piano e la rende TOPMOST.
+3. Clicca il pulsante "Continua" (o testo configurabile).
+4. Verifica che il pulsante non sia piu' visibile prima di dichiarare successo.
+5. Ripristina lo stato della finestra.
 
 Uso tipico::
 
@@ -34,10 +33,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 user32 = ctypes.windll.user32  # type: ignore[attr-defined]
-
-BlockInput = user32.BlockInput
-BlockInput.argtypes = [wintypes.BOOL]
-BlockInput.restype = wintypes.BOOL
 
 SetWindowPos = user32.SetWindowPos
 SetWindowPos.argtypes = [
@@ -75,35 +70,30 @@ DEFAULT_POLL_INTERVAL = 0.3
 
 @contextlib.contextmanager
 def _focus_lock(window, timeout: float = 2.0):
-    """Disabilita input + finestra topmost per ``timeout`` secondi.
+    """Rende la finestra temporaneamente TOPMOST durante il click.
 
-    Viene usato ``BlockInput`` (richiede process con privileges) per impedire
-    all'utente di cliccare altrove durante l'operazione.  La finestra viene
-    resa TOPMOST per evitare che qualcosa la copra.
-
-    Il blocco e' limitato a ``timeout`` secondi per sicurezza: se qualcosa
-    va storto e il click non parte, l'utente riprende il controllo.
+    Non usare ``BlockInput`` qui: ``click_input()`` invia un input del mouse
+    reale e Windows puo' bloccarlo insieme all'input dell'utente.  Il sintomo
+    e' un click registrato nel log, con il dialog che resta aperto.
     """
     try:
-        BlockInput(True)
         SetWindowPos(
             window.handle, HWND_TOPMOST,
             0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
         )
-        logger.debug("Focus lock attivato (timeout=%.1fs).", timeout)
+        logger.debug("Finestra resa topmost (timeout=%.1fs).", timeout)
         yield
     except Exception:
         logger.exception("Errore durante focus lock.")
         raise
     finally:
-        BlockInput(False)
         SetWindowPos(
             window.handle, HWND_NOTOPMOST,
             0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
         )
-        logger.debug("Focus lock rilasciato.")
+        logger.debug("Stato topmost ripristinato.")
 
 
 # ---------------------------------------------------------------------------
@@ -182,17 +172,33 @@ def find_popup(
 # ---------------------------------------------------------------------------
 
 def _try_invoke(btn) -> bool:
-    """Prova invoke() via UIA, poi click_input() come fallback."""
+    """Prova invoke() via UIA, poi click_input() come fallback.
+
+    Restituisce successo solo quando il pulsante di conferma e' sparito.
+    ``click_input()`` puo' completare senza eccezioni anche se Windows non
+    consegna il click alla finestra remota.
+    """
+    def confirmation_closed() -> bool:
+        time.sleep(0.3)
+        try:
+            return not (btn.exists(timeout=0.7) and btn.is_visible())
+        except Exception:
+            return True
+
     try:
         btn.invoke()
-        logger.info("Click via invoke() riuscito.")
-        return True
+        if confirmation_closed():
+            logger.info("Click via invoke() confermato: pulsante scomparso.")
+            return True
+        logger.warning("invoke() inviato, ma il pulsante di conferma e' ancora visibile.")
     except Exception:
         logger.debug("invoke() non disponibile, provo click_input().")
     try:
         btn.click_input()
-        logger.info("Click via click_input() eseguito.")
-        return True
+        if confirmation_closed():
+            logger.info("Click via click_input() confermato: pulsante scomparso.")
+            return True
+        logger.warning("click_input() inviato, ma il pulsante di conferma e' ancora visibile.")
     except Exception:
         logger.exception("Anche click_input() fallito.")
     return False
