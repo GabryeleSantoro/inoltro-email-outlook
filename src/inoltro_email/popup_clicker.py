@@ -172,7 +172,7 @@ def find_popup(
 # ---------------------------------------------------------------------------
 
 def _try_invoke(btn) -> bool:
-    """Prova invoke() via UIA, poi click_input() come fallback.
+    """Prova UIA, tastiera, poi mouse come fallback.
 
     Restituisce successo solo quando il pulsante di conferma e' sparito.
     ``click_input()`` puo' completare senza eccezioni anche se Windows non
@@ -182,8 +182,13 @@ def _try_invoke(btn) -> bool:
         time.sleep(0.3)
         try:
             return not (btn.exists(timeout=0.7) and btn.is_visible())
-        except Exception:
-            return True
+        except Exception as exc:
+            # Un errore UIA non dimostra che il dialog sia chiuso.  Con RDP
+            # puo' essere solo una lettura temporaneamente non disponibile.
+            logger.warning(
+                "Impossibile verificare la chiusura del pulsante: %s", exc,
+            )
+            return False
 
     try:
         btn.invoke()
@@ -192,7 +197,17 @@ def _try_invoke(btn) -> bool:
             return True
         logger.warning("invoke() inviato, ma il pulsante di conferma e' ancora visibile.")
     except Exception:
-        logger.debug("invoke() non disponibile, provo click_input().")
+        logger.debug("invoke() non disponibile, provo Enter.", exc_info=True)
+    try:
+        # Nessuna coordinata video: piu' affidabile con DPI scaling e RDP.
+        btn.set_focus()
+        btn.type_keys("{ENTER}")
+        if confirmation_closed():
+            logger.info("Conferma via Enter riuscita: pulsante scomparso.")
+            return True
+        logger.warning("Enter inviato, ma il pulsante di conferma e' ancora visibile.")
+    except Exception:
+        logger.debug("Enter non disponibile, provo click_input().", exc_info=True)
     try:
         btn.click_input()
         if confirmation_closed():
@@ -208,6 +223,17 @@ def _click_button_uia(window, button_text: str) -> bool:
     """Cerca e clicca il pulsante via UIA (Accesso per nome, Rol, etc.)."""
     btn_lower = button_text.lower()
     try:
+        # Identificatore stabile del dialog "Esegui flusso" di PAD.
+        try:
+            btn = window.child_window(
+                auto_id="OKRunFlowFromProtocolHandlerButton",
+                control_type="Button",
+            )
+            if btn.exists(timeout=0):
+                return _try_invoke(btn)
+        except Exception:
+            pass
+
         # 1) Accesso per nome diretto + control_type Button
         try:
             btn = window.child_window(title=button_text, control_type="Button")
