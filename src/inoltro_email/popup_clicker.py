@@ -24,7 +24,7 @@ import ctypes
 import logging
 import time
 from ctypes import wintypes
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,8 @@ DEFAULT_POPUP_TITLE = "Power Automate"
 DEFAULT_BUTTON_TEXT = "Continua"
 DEFAULT_POPUP_TIMEOUT = 10
 DEFAULT_POLL_INTERVAL = 0.3
+CONFIRM_BUTTON_AUTO_ID = "OKRunFlowFromProtocolHandlerButton"
+CONFIRM_CLOSE_TIMEOUT = 3.0
 
 
 # ---------------------------------------------------------------------------
@@ -171,17 +173,23 @@ def find_popup(
 # Click
 # ---------------------------------------------------------------------------
 
-def _try_invoke(btn) -> bool:
+def _try_invoke(
+    btn,
+    confirmation_closed: Optional[Callable[[], bool]] = None,
+) -> bool:
     """Prova UIA, tastiera, poi mouse come fallback.
 
     Restituisce successo solo quando il pulsante di conferma e' sparito.
     ``click_input()`` puo' completare senza eccezioni anche se Windows non
     consegna il click alla finestra remota.
     """
-    def confirmation_closed() -> bool:
+    def wrapper_disappeared() -> bool:
         time.sleep(0.3)
         try:
-            return not (btn.exists(timeout=0.7) and btn.is_visible())
+            exists = getattr(btn, "exists", None)
+            if callable(exists) and not exists(timeout=0.7):
+                return True
+            return not btn.is_visible()
         except Exception as exc:
             # Un errore UIA non dimostra che il dialog sia chiuso.  Con RDP
             # puo' essere solo una lettura temporaneamente non disponibile.
@@ -190,9 +198,11 @@ def _try_invoke(btn) -> bool:
             )
             return False
 
+    verify_closed = confirmation_closed or wrapper_disappeared
+
     try:
         btn.invoke()
-        if confirmation_closed():
+        if verify_closed():
             logger.info("Click via invoke() confermato: pulsante scomparso.")
             return True
         logger.warning("invoke() inviato, ma il pulsante di conferma e' ancora visibile.")
@@ -202,7 +212,7 @@ def _try_invoke(btn) -> bool:
         # Nessuna coordinata video: piu' affidabile con DPI scaling e RDP.
         btn.set_focus()
         btn.type_keys("{ENTER}")
-        if confirmation_closed():
+        if verify_closed():
             logger.info("Conferma via Enter riuscita: pulsante scomparso.")
             return True
         logger.warning("Enter inviato, ma il pulsante di conferma e' ancora visibile.")
@@ -210,12 +220,42 @@ def _try_invoke(btn) -> bool:
         logger.debug("Enter non disponibile, provo click_input().", exc_info=True)
     try:
         btn.click_input()
-        if confirmation_closed():
+        if verify_closed():
             logger.info("Click via click_input() confermato: pulsante scomparso.")
             return True
         logger.warning("click_input() inviato, ma il pulsante di conferma e' ancora visibile.")
     except Exception:
         logger.exception("Anche click_input() fallito.")
+    return False
+
+
+def _uia_confirmation_closed(window_handle: int) -> bool:
+    """Verifica il dialog con una nuova query UIA, evitando wrapper obsoleti.
+
+    PAD puo' lasciare in cache il vecchio wrapper del pulsante dopo aver chiuso
+    il dialog. Interrogare di nuovo il desktop distingue quel caso da un click
+    realmente non consegnato.
+    """
+    from pywinauto import Desktop
+
+    deadline = time.monotonic() + CONFIRM_CLOSE_TIMEOUT
+    while time.monotonic() < deadline:
+        try:
+            window = Desktop(backend="uia").window(handle=window_handle)
+            button = window.child_window(
+                auto_id=CONFIRM_BUTTON_AUTO_ID,
+                control_type="Button",
+            )
+            if not button.exists(timeout=0):
+                return True
+            if not button.is_visible():
+                return True
+        except Exception as exc:
+            logger.debug(
+                "Verifica UIA del dialog temporaneamente non disponibile: %s",
+                exc,
+            )
+        time.sleep(0.1)
     return False
 
 
@@ -226,11 +266,14 @@ def _click_button_uia(window, button_text: str) -> bool:
         # Identificatore stabile del dialog "Esegui flusso" di PAD.
         try:
             btn = window.child_window(
-                auto_id="OKRunFlowFromProtocolHandlerButton",
+                auto_id=CONFIRM_BUTTON_AUTO_ID,
                 control_type="Button",
             )
             if btn.exists(timeout=0):
-                return _try_invoke(btn)
+                return _try_invoke(
+                    btn,
+                    confirmation_closed=lambda: _uia_confirmation_closed(window.handle),
+                )
         except Exception:
             pass
 
@@ -296,7 +339,7 @@ def _click_button_uia(window, button_text: str) -> bool:
 
 
 def _click_button_win32(window, button_text: str) -> bool:
-    """Cerca e clicca il pulsante via Win32 backend."""
+    """Cerca e clicca solo controlli Win32 realmente di classe Button."""
     btn_lower = button_text.lower()
     try:
         try:
@@ -306,24 +349,13 @@ def _click_button_win32(window, button_text: str) -> bool:
         except Exception:
             pass
 
-        try:
-            btn = window.child_window(title=button_text)
-            if btn.exists(timeout=0):
-                return _try_invoke(btn)
-        except Exception:
-            pass
-
-        try:
-            btn = window.child_window(title_re=f"(?i){button_text}")
-            if btn.exists(timeout=0):
-                return _try_invoke(btn)
-        except Exception:
-            pass
-
         for child in window.descendants():
             try:
                 name = (child.window_text() or "").lower()
-                if btn_lower in name:
+                class_name = (
+                    getattr(child.element_info, "class_name", "") or ""
+                ).lower()
+                if class_name == "button" and btn_lower in name:
                     return _try_invoke(child)
             except Exception:
                 continue
@@ -332,7 +364,12 @@ def _click_button_win32(window, button_text: str) -> bool:
         for child in window.descendants():
             try:
                 aid = (getattr(child.element_info, "automation_id", "") or "").lower()
-                if any(kw in aid for kw in ("continue", "continua", "ok", "accept")):
+                class_name = (
+                    getattr(child.element_info, "class_name", "") or ""
+                ).lower()
+                if class_name == "button" and any(
+                    kw in aid for kw in ("continue", "continua", "ok", "accept")
+                ):
                     return _try_invoke(child)
             except Exception:
                 continue
@@ -344,7 +381,10 @@ def _click_button_win32(window, button_text: str) -> bool:
                 for desc in dialog.descendants():
                     try:
                         name = (desc.window_text() or "").lower()
-                        if btn_lower in name:
+                        class_name = (
+                            getattr(desc.element_info, "class_name", "") or ""
+                        ).lower()
+                        if class_name == "button" and btn_lower in name:
                             return _try_invoke(desc)
                     except Exception:
                         continue

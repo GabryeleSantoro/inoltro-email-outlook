@@ -276,9 +276,9 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/popup_clicker.py": {
-    "mtime": 1788512495.7100313,
-    "seen": 1788512601.2532678,
-    "ast_hash": "9703a5f70fe679de2b80b0cd9ef7e4d0",
+    "mtime": 1787642783.96033,
+    "seen": 1787825428.7432318,
+    "ast_hash": "07ce60da4127f3d23f1a58015db126b4",
     "semantic_hash": ""
   },
   "src/inoltro_email/message_guard.py": {
@@ -297,12 +297,6 @@
     "mtime": 1788440968.4726908,
     "seen": 1788441039.274622,
     "ast_hash": "237bc3a3fdc7afc39aa691b5bdbf1db2",
-    "semantic_hash": ""
-  },
-  "tests/test_popup_clicker.py": {
-    "mtime": 1788512496.3351073,
-    "seen": 1788512601.2532825,
-    "ast_hash": "874afa95821b462355850a16bbf60ae8",
     "semantic_hash": ""
   }
 }
