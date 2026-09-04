@@ -259,6 +259,33 @@ def _uia_confirmation_closed(window_handle: int) -> bool:
     return False
 
 
+def _window_has_uia_confirmation(window) -> bool:
+    """Dice se la finestra contiene ancora il vero pulsante di conferma PAD."""
+    try:
+        button = window.child_window(
+            auto_id=CONFIRM_BUTTON_AUTO_ID,
+            control_type="Button",
+        )
+        return button.exists(timeout=0) and button.is_visible()
+    except Exception:
+        return False
+
+
+def _uia_confirmation_present(title_re) -> bool:
+    """Rilegge tutto il desktop per evitare risultati UIA rimasti in cache."""
+    from pywinauto import Desktop
+
+    try:
+        return any(
+            _window_has_uia_confirmation(window)
+            for window in Desktop(backend="uia").windows(title_re=title_re)
+        )
+    except Exception as exc:
+        logger.debug("Controllo globale del dialog PAD fallito: %s", exc)
+        # Se non possiamo verificare, non dichiariamo successo.
+        return True
+
+
 def _click_button_uia(window, button_text: str) -> bool:
     """Cerca e clicca il pulsante via UIA (Accesso per nome, Rol, etc.)."""
     btn_lower = button_text.lower()
@@ -477,6 +504,7 @@ def click_continue(
     
     dumped_handles: set[int] = set()   # dump una sola volta per handle
     last_window = None
+    confirmation_seen = False
 
     while time.monotonic() < deadline:
         for backend in ["uia", "win32"]:
@@ -488,6 +516,8 @@ def click_continue(
                         continue
 
                     last_window = popup
+                    if backend == "uia" and _window_has_uia_confirmation(popup):
+                        confirmation_seen = True
 
                     # --- dump albero controlli appena trovata ---
                     h = popup.handle
@@ -520,7 +550,7 @@ def click_continue(
                                 )
                                 return True
                             else:
-                                logger.warning(
+                                logger.debug(
                                     "Pulsante '%s' NON trovato nella finestra '%s' (backend=%s).",
                                     button_text, popup.window_text(), backend,
                                 )
@@ -528,6 +558,17 @@ def click_continue(
                         logger.debug("Errore temporaneo durante il click, riprovo...")
             except Exception:
                 pass
+
+        # Il dialog puo' chiudersi in modo asincrono subito dopo il timeout
+        # della verifica interna, oppure essere confermato manualmente. Se il
+        # vero pulsante e' stato visto e ora non esiste piu', il lavoro e'
+        # concluso: non continuare a cercarlo per tutto il timeout esterno.
+        if confirmation_seen and not _uia_confirmation_present(title_re):
+            logger.info(
+                "Dialog di conferma PAD chiuso: pulsante '%s' non piu' presente.",
+                button_text,
+            )
+            return True
                 
         time.sleep(poll_interval)
 

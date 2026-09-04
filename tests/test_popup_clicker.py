@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import contextlib
+import sys
+from types import SimpleNamespace
+
 from inoltro_email import popup_clicker
 
 
@@ -58,6 +62,44 @@ def test_verifica_esterna_evita_loop_con_wrapper_uia_obsoleto(monkeypatch) -> No
     assert pulsante.invoke_chiamati == 1
     assert pulsante.click_chiamati == 0
     assert pulsante.visibile is True  # wrapper vecchio rimasto in cache
+
+
+def test_popup_visto_e_poi_sparito_termina_la_ricerca(monkeypatch) -> None:
+    class FintaFinestra:
+        handle = 123
+
+        def is_visible(self) -> bool:
+            return True
+
+        def window_text(self) -> str:
+            return "Power Automate"
+
+    class FintoDesktop:
+        def __init__(self, backend: str) -> None:
+            self.backend = backend
+
+        def windows(self, **_kwargs):
+            return [FintaFinestra()]
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pywinauto",
+        SimpleNamespace(Desktop=FintoDesktop),
+    )
+    monkeypatch.setattr(popup_clicker, "_dump_all_visible_windows", lambda _backend: [])
+    monkeypatch.setattr(popup_clicker, "_dump_window_tree", lambda _window: [])
+    monkeypatch.setattr(popup_clicker, "SetForegroundWindow", lambda _handle: True)
+    monkeypatch.setattr(
+        popup_clicker,
+        "_focus_lock",
+        lambda _window, timeout: contextlib.nullcontext(),
+    )
+    monkeypatch.setattr(popup_clicker, "_click_button_uia", lambda *_args: False)
+    monkeypatch.setattr(popup_clicker, "_click_button_win32", lambda *_args: False)
+    monkeypatch.setattr(popup_clicker, "_window_has_uia_confirmation", lambda _window: True)
+    monkeypatch.setattr(popup_clicker, "_uia_confirmation_present", lambda _title: False)
+
+    assert popup_clicker.click_continue(timeout=1) is True
 
 
 def test_modulo_non_blocca_input_di_windows() -> None:
