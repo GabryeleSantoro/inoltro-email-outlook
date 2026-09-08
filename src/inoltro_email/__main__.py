@@ -56,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=None, help="porta di ascolto (default: api.port)")
     serve.add_argument("--reload", action="store_true",
                        help="ricarica automaticamente al cambiare del codice (sviluppo)")
+    serve.add_argument(
+        "--dev",
+        action="store_true",
+        help="disattiva registro email e controllo duplicati (solo sviluppo)",
+    )
     serve.add_argument("--flow-path", type=Path, default=None,
                        help="percorso del file .lnk del flusso Power Automate da eseguire")
     serve.add_argument("--flow-timer", type=int, default=None,
@@ -112,6 +117,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             exit_code = _cmd_serve(
                 settings,
                 reload=args.reload,
+                dev_mode=args.dev,
                 flow_path=flow_path,
                 flow_timer=flow_timer,
                 session_log_file=log_file,
@@ -144,6 +150,7 @@ def _cmd_serve(
     settings: Settings,
     *,
     reload: bool = False,
+    dev_mode: bool = False,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
     session_log_file: Optional[Path] = None,
@@ -154,6 +161,7 @@ def _cmd_serve(
     run(
         settings,
         reload=reload,
+        dev_mode=dev_mode,
         flow_path=flow_path,
         flow_timer=flow_timer,
         session_log_file=session_log_file,

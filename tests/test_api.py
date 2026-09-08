@@ -130,6 +130,37 @@ def test_email_gia_registrata_non_viene_analizzata(
     assert ocr.calls == []
 
 
+def test_modalita_dev_non_registra_e_non_controlla_i_duplicati(
+    settings: Settings, ocr: FakeOcrClient, tmp_path
+) -> None:
+    database = tmp_path / "checked.sqlite3"
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+
+    with TestClient(create_app(
+        settings, analyzer=analyzer, message_store_path=database, dev_mode=True,
+    )) as instance:
+        registrazione = instance.post("/registra-email", json=payload)
+        prima = instance.post("/analizza-email", json=payload)
+        seconda = instance.post("/analizza-email", json=payload)
+        salute = instance.get("/salute")
+
+    assert registrazione.status_code == 202
+    assert registrazione.json() == {
+        "id_messaggio": payload["internetMessageId"],
+        "oggetto": payload["subject"],
+        "esito": "non_registrata_dev",
+        "registrata": False,
+        "motivo": "modalita_sviluppo",
+        "modalita_sviluppo": True,
+    }
+    assert prima.status_code == 200
+    assert seconda.status_code == 200
+    assert len(ocr.calls) == 2
+    assert salute.json()["modalita_sviluppo"] is True
+    assert not database.exists()
+
+
 def test_analisi_non_registra_il_messaggio(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
@@ -167,6 +198,32 @@ def test_registrazione_non_altera_il_riepilogo_analisi(
     assert "EMAIL DA INOLTRARE: 1" in log
     assert "EMAIL SCARTATE: 0" in log
     assert "motivo=gia_registrato" not in log
+
+
+def test_logga_il_payload_troncando_solo_content_bytes(
+    client: TestClient, caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    attachment = attachment_payload("foto.jpg", b"x" * 120, content_type="image/jpeg")
+    content_bytes = attachment["contentBytes"]
+    payload = email_payload(
+        body="Corpo originale da mostrare nel JSON.",
+        attachments=[{"Properties": attachment, "TypeId": "FileAttachment"}],
+    )
+
+    risposta = client.post("/analizza-email", json=payload)
+
+    assert risposta.status_code in {200, 202}
+    log = caplog.text
+    assert "PAYLOAD JSON RICEVUTO:" in log
+    assert '"body": "Corpo originale da mostrare nel JSON."' in log
+    assert '"Properties": {' in log
+    assert '"contentBytes": "eHh4' in log
+    assert f"[troncato, totale={len(content_bytes)} caratteri]" in log
+    assert content_bytes not in log
+    assert "Email ricevuta:" not in log
+    assert "Corpo testo (" not in log
+    assert "EMAIL RICEVUTA |" not in log
 
 
 def test_email_fuori_tema_letta_comunque(client: TestClient, ocr: FakeOcrClient) -> None:

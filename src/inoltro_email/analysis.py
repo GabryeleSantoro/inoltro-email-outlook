@@ -43,7 +43,6 @@ from .sentiment import analyze_sentiment
 logger = logging.getLogger(__name__)
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-_BODY_PREVIEW_CHARS = 4000
 # Quanto testo dell'OCR finisce nei log. Un referto di venti pagine non serve
 # per intero: il criterio cercato sta sempre nelle prime righe.
 _TEXT_LOG_CHARS = 4000
@@ -73,8 +72,6 @@ class EmailAnalyzer:
         """
         started = time.monotonic()
         subject = email.subject or "(senza oggetto)"
-        self._log_inbound_email(email)
-
         screening = screen(email.subject, email.body_text, self._settings.screening)
         logger.info(
             "Screening di '%s': %s (termini: %s)",
@@ -162,49 +159,6 @@ class EmailAnalyzer:
                 f"del {minimum:.0f}% richiesto per chiamare l'OCR"
             )
         return None
-
-    def _log_inbound_email(self, email: InboundEmail) -> None:
-        """Logga il contenuto in ingresso per facilitare il debug del flusso."""
-        logger.info(
-            "Email ricevuta: id=%s da=%s ricevuta_il=%s oggetto='%s'",
-            email.key,
-            email.sender or "mittente ignoto",
-            email.received_at or "sconosciuta",
-            email.subject or "(senza oggetto)",
-        )
-
-        if email.body_text.strip():
-            logger.info(
-                "Corpo testo (%d caratteri): %s",
-                len(email.body_text),
-                _clip(email.body_text, _BODY_PREVIEW_CHARS),
-            )
-            logger.debug("Corpo testo completo:\n%s", email.body_text)
-        else:
-            logger.info("Corpo testo vuoto.")
-
-        if email.body_html.strip():
-            logger.debug(
-                "Corpo HTML (%d caratteri):\n%s",
-                len(email.body_html),
-                email.body_html,
-            )
-
-        if not email.attachments:
-            logger.info("Nessun allegato nel payload.")
-            return
-
-        logger.info("Allegati ricevuti: %d", len(email.attachments))
-        for index, item in enumerate(email.attachments, start=1):
-            logger.info(
-                "Allegato %d: nome='%s' origine=%s tipo=%s dimensione=%d byte provenienza=%s",
-                index,
-                item.name,
-                item.origine.value,
-                item.content_type or "sconosciuto",
-                item.size_bytes,
-                item.source_path if item.source_path is not None else "payload (base64)",
-            )
 
     # ------------------------------------------------------ allegati e foto
 

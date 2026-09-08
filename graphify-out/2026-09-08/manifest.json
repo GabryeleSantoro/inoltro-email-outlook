@@ -36,10 +36,10 @@
     "semantic_hash": ""
   },
   "src/inoltro_email/analysis.py": {
-    "mtime": 1788859210.0197806,
-    "seen": 1788859301.1655605,
-    "ast_hash": "75c9c12eb8ebf64d8f3b0c299801fce2",
-    "semantic_hash": ""
+    "mtime": 1787301015.70861,
+    "seen": 1787312106.117599,
+    "ast_hash": "b312817be73bdf77d2421ac7bbfa44d1",
+    "semantic_hash": "b312817be73bdf77d2421ac7bbfa44d1"
   },
   "src/inoltro_email/api/__init__.py": {
     "mtime": 1787301015.709322,
@@ -48,9 +48,9 @@
     "semantic_hash": "f0959a9a9a00fa996ae03dfa369db1ae"
   },
   "src/inoltro_email/api/app.py": {
-    "mtime": 1788859209.2969582,
-    "seen": 1788859301.165563,
-    "ast_hash": "d91de93c96eca9531117bd98cef73be4",
+    "mtime": 1788854851.2139986,
+    "seen": 1788854886.956351,
+    "ast_hash": "71e56ca7177f2fa8110930ac51b32adb",
     "semantic_hash": ""
   },
   "src/inoltro_email/api/responses.py": {
@@ -156,9 +156,9 @@
     "semantic_hash": "b8c6a7313d4f97373e5cd73534e5c805"
   },
   "tests/test_api.py": {
-    "mtime": 1788859210.6427085,
-    "seen": 1788859301.1655872,
-    "ast_hash": "05697645bf5dbcbd41e4b86b2746a3e9",
+    "mtime": 1788854703.8761837,
+    "seen": 1788854800.52416,
+    "ast_hash": "313d8c1f15f311e593a3fdb36ce770af",
     "semantic_hash": ""
   },
   "tests/test_cli.py": {
@@ -309,18 +309,6 @@
     "mtime": 1788851144.8267264,
     "seen": 1788854800.5241752,
     "ast_hash": "2ea68e4355e1ae7f4bcc56f0393426b5",
-    "semantic_hash": ""
-  },
-  "graphify-out/memory/query_20260908_080903_diagnosi_log_allegato_132582_jpg_senza_base64_e_ag.md": {
-    "mtime": 1788854943.5556986,
-    "seen": 1788859301.1656067,
-    "ast_hash": "5ddcc0c483b49d0443ed6fd01b29f2e8",
-    "semantic_hash": ""
-  },
-  "graphify-out/memory/query_20260908_083336_tutte_le_email_hanno_allegati__cosa_e_andato_stort.md": {
-    "mtime": 1788856416.7550836,
-    "seen": 1788859301.1656075,
-    "ast_hash": "7e5b0f7510665367db7994fb00d71365",
     "semantic_hash": ""
   }
 }

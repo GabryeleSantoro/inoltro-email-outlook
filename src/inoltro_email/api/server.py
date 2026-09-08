@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _SESSION_LOG_FILE_ENV = "INOLTRO_EMAIL_SESSION_LOG_FILE"
 _SESSION_LOG_LEVEL_ENV = "INOLTRO_EMAIL_SESSION_LOG_LEVEL"
+_DEV_MODE_ENV = "INOLTRO_EMAIL_DEV_MODE"
 
 
 def _configure_reload_worker_logging() -> None:
@@ -46,13 +47,17 @@ def build() -> "object":
     flow_timer = int(os.environ.get("INOLTRO_EMAIL_FLOW_TIMER", "60"))
     if flow_timer <= 0:
         raise ValueError("INOLTRO_EMAIL_FLOW_TIMER deve essere maggiore di zero.")
-    return create_app(flow_path=flow_path, flow_timer=flow_timer)
+    dev_mode = os.environ.get(_DEV_MODE_ENV, "").strip().casefold() in {
+        "1", "true", "yes", "on",
+    }
+    return create_app(flow_path=flow_path, flow_timer=flow_timer, dev_mode=dev_mode)
 
 
 def run(
     settings: Optional[Settings] = None,
     *,
     reload: bool = False,
+    dev_mode: bool = False,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
     session_log_file: Optional[Path] = None,
@@ -78,6 +83,10 @@ def run(
         )
 
     if reload:
+        if dev_mode:
+            os.environ[_DEV_MODE_ENV] = "1"
+        else:
+            os.environ.pop(_DEV_MODE_ENV, None)
         if flow_path:
             os.environ["INOLTRO_EMAIL_FLOW_PATH"] = str(flow_path.resolve())
             os.environ["INOLTRO_EMAIL_FLOW_TIMER"] = str(flow_timer)
@@ -97,7 +106,12 @@ def run(
         )
         return
 
-    app = create_app(settings, flow_path=flow_path, flow_timer=flow_timer)
+    app = create_app(
+        settings,
+        flow_path=flow_path,
+        flow_timer=flow_timer,
+        dev_mode=dev_mode,
+    )
     uvicorn.run(
         app,
         host=settings.api.host,

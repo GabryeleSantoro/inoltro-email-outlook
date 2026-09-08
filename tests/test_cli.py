@@ -173,6 +173,7 @@ def test_serve_usa_host_e_porta_della_riga_di_comando(config_file: Path,
     def finto_run(
         settings,
         reload=False,
+        dev_mode=False,
         flow_path=None,
         flow_timer=60,
         session_log_file=None,
@@ -181,24 +182,31 @@ def test_serve_usa_host_e_porta_della_riga_di_comando(config_file: Path,
         visto["host"] = settings.api.host
         visto["port"] = settings.api.port
         visto["reload"] = reload
+        visto["dev_mode"] = dev_mode
 
     monkeypatch.setattr("inoltro_email.api.server.run", finto_run)
-    code = main(["--config", str(config_file), "serve", "--host", "127.0.0.1", "--port", "9999"])
+    code = main([
+        "--config", str(config_file), "serve", "--host", "127.0.0.1",
+        "--port", "9999", "--dev",
+    ])
 
     assert code == 0
-    assert visto == {"host": "127.0.0.1", "port": 9999, "reload": False}
+    assert visto == {
+        "host": "127.0.0.1", "port": 9999, "reload": False, "dev_mode": True,
+    }
 
 
 def test_serve_senza_argomenti_usa_la_configurazione(config_file: Path,
                                                      monkeypatch: pytest.MonkeyPatch) -> None:
     visto = {}
     monkeypatch.setattr("inoltro_email.api.server.run",
-                        lambda settings, reload=False, flow_path=None, flow_timer=60,
+                        lambda settings, reload=False, dev_mode=False, flow_path=None, flow_timer=60,
                         session_log_file=None, log_level=None:
-                        visto.update(port=settings.api.port))
+                        visto.update(port=settings.api.port, dev_mode=dev_mode))
     main(["--config", str(config_file), "serve"])
 
     assert visto["port"] == 8123
+    assert visto["dev_mode"] is False
 
 
 def test_configurazione_mancante(tmp_path: Path, capsys) -> None:

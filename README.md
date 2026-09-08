@@ -204,9 +204,15 @@ uv run python -m inoltro_email serve --port 9000 --reload
 # Oppure direttamente (se il venv e' attivo)
 python -m inoltro_email serve
 python -m inoltro_email serve --port 9000 --reload
+# sviluppo: niente registro e nessun controllo duplicati
+python -m inoltro_email serve --dev
 # imposta l'intervallo di controllo del flow locale a 60 secondi
 python -m inoltro_email serve --flow-timer 60
 ```
+
+Con `serve --dev` il servizio analizza ogni richiesta, anche se gia' vista, e
+`POST /registra-email` risponde senza scrivere il payload nel registro SQLite.
+Il flag funziona anche con `python main.py --dev` e con `--reload`.
 
 In produzione si puo' usare direttamente uvicorn con piu' processi:
 

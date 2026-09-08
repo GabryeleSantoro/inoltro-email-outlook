@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-09-08T08:37:51.581885+00:00",
+  "nodes": {
+    "src_inoltro_email_analysis_emailanalyzer": {
+      "code_fingerprint": "c61d3119fbf1518b4f1576613fd0332b465b7b013ebbf1e1328feaad7484900e",
+      "label": "EmailAnalyzer",
+      "last": "2026-09-08T07:05:44.826004+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T07:05:44.826004+00:00",
+          "outcome": "useful",
+          "q": "Nell'ultima run una email con un allegato ha avuto un problema. Nei log risulta Nessun allegato nel payload. Quando dice così si intende che non ci sono elementi nel corpo email? Poi ha tentato di analizzare un allegato, ma ha loggato Nessun dato base64 ritrovato, ignorato. In che condizioni succede ciò?"
+        }
+      ],
+      "score": 0.998523138,
+      "source_file": "src/inoltro_email/analysis.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_api_app_create_app": {
+      "code_fingerprint": "fd948d4629ba50a04ae1e8492bbb3cf7568d1a8a0128902f74fe8817af0bc9ea",
+      "label": "create_app()",
+      "last": "2026-09-08T08:09:03.554182+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:09:03.554182+00:00",
+          "outcome": "useful",
+          "q": "Diagnosi log allegato 132582.jpg senza base64 e aggiunta flag --dev per non salvare email e saltare duplicati"
+        }
+      ],
+      "score": 0.999538001,
+      "source_file": "src/inoltro_email/api/app.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_api_server_run": {
+      "code_fingerprint": "7c06d33302a339cc105042ef7fb516f34ae8b651d8ecdf9a557bf6b8ef02cd5a",
+      "label": "run()",
+      "last": "2026-09-08T08:09:03.554182+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:09:03.554182+00:00",
+          "outcome": "useful",
+          "q": "Diagnosi log allegato 132582.jpg senza base64 e aggiunta flag --dev per non salvare email e saltare duplicati"
+        }
+      ],
+      "score": 0.999538001,
+      "source_file": "src/inoltro_email/api/server.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_inbound_from_data_uri": {
+      "code_fingerprint": "c9d1ab3d54d65225745bf20ab158ca80fe3f2dd4052fbe7916a2ab0d31e22229",
+      "label": "_from_data_uri()",
+      "last": "2026-09-08T08:33:36.753818+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:33:36.753818+00:00",
+          "outcome": "useful",
+          "q": "Tutte le email hanno allegati, cosa e andato storto nei log della run 2026-09-08 10:30"
+        }
+      ],
+      "score": 0.999931857,
+      "source_file": "src/inoltro_email/inbound.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_inbound_parse_email": {
+      "code_fingerprint": "c9d1ab3d54d65225745bf20ab158ca80fe3f2dd4052fbe7916a2ab0d31e22229",
+      "label": "parse_email()",
+      "last": "2026-09-08T08:33:36.753818+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:33:36.753818+00:00",
+          "outcome": "useful",
+          "q": "Tutte le email hanno allegati, cosa e andato storto nei log della run 2026-09-08 10:30"
+        },
+        {
+          "date": "2026-09-08T07:05:44.826004+00:00",
+          "outcome": "useful",
+          "q": "Nell'ultima run una email con un allegato ha avuto un problema. Nei log risulta Nessun allegato nel payload. Quando dice così si intende che non ci sono elementi nel corpo email? Poi ha tentato di analizzare un allegato, ma ha loggato Nessun dato base64 ritrovato, ignorato. In che condizioni succede ciò?"
+        }
+      ],
+      "score": 1.998454995,
+      "source_file": "src/inoltro_email/inbound.py",
+      "status": "preferred",
+      "uses": 2
+    },
+    "src_inoltro_email_inbound_read_attachments": {
+      "code_fingerprint": "c9d1ab3d54d65225745bf20ab158ca80fe3f2dd4052fbe7916a2ab0d31e22229",
+      "label": "_read_attachments()",
+      "last": "2026-09-08T08:33:36.753818+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:33:36.753818+00:00",
+          "outcome": "useful",
+          "q": "Tutte le email hanno allegati, cosa e andato storto nei log della run 2026-09-08 10:30"
+        },
+        {
+          "date": "2026-09-08T08:09:03.554182+00:00",
+          "outcome": "useful",
+          "q": "Diagnosi log allegato 132582.jpg senza base64 e aggiunta flag --dev per non salvare email e saltare duplicati"
+        },
+        {
+          "date": "2026-09-08T07:05:44.826004+00:00",
+          "outcome": "useful",
+          "q": "Nell'ultima run una email con un allegato ha avuto un problema. Nei log risulta Nessun allegato nel payload. Quando dice così si intende che non ci sono elementi nel corpo email? Poi ha tentato di analizzare un allegato, ma ha loggato Nessun dato base64 ritrovato, ignorato. In che condizioni succede ciò?"
+        }
+      ],
+      "score": 2.997992996,
+      "source_file": "src/inoltro_email/inbound.py",
+      "status": "preferred",
+      "uses": 3
+    },
+    "src_inoltro_email_inbound_read_path_attachments": {
+      "code_fingerprint": "c9d1ab3d54d65225745bf20ab158ca80fe3f2dd4052fbe7916a2ab0d31e22229",
+      "label": "_read_path_attachments()",
+      "last": "2026-09-08T07:05:44.826004+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T07:05:44.826004+00:00",
+          "outcome": "useful",
+          "q": "Nell'ultima run una email con un allegato ha avuto un problema. Nei log risulta Nessun allegato nel payload. Quando dice così si intende che non ci sono elementi nel corpo email? Poi ha tentato di analizzare un allegato, ma ha loggato Nessun dato base64 ritrovato, ignorato. In che condizioni succede ciò?"
+        }
+      ],
+      "score": 0.998523138,
+      "source_file": "src/inoltro_email/inbound.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_message_guard_localmessagestore": {
+      "code_fingerprint": "11957f41a0cd0c7ed8dfb5f7ef8353563f220f075a60119807b269c063917494",
+      "label": "LocalMessageStore",
+      "last": "2026-09-08T08:09:03.554182+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:09:03.554182+00:00",
+          "outcome": "useful",
+          "q": "Diagnosi log allegato 132582.jpg senza base64 e aggiunta flag --dev per non salvare email e saltare duplicati"
+        }
+      ],
+      "score": 0.999538001,
+      "source_file": "src/inoltro_email/message_guard.py",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_inoltro_email_models_inboundattachment": {
+      "code_fingerprint": "e3ad6eccd3fa04b20dc5755f2d06748d41302063e275da4a4d436a885e16ee0b",
+      "label": "InboundAttachment",
+      "last": "2026-09-08T08:33:36.753818+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-08T08:33:36.753818+00:00",
+          "outcome": "useful",
+          "q": "Tutte le email hanno allegati, cosa e andato storto nei log della run 2026-09-08 10:30"
+        }
+      ],
+      "score": 0.999931857,
+      "source_file": "src/inoltro_email/models.py",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
+  "version": 1
+}

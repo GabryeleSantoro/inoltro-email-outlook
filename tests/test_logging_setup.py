@@ -157,6 +157,7 @@ def test_reload_passa_il_log_di_sessione_al_worker(
     server.run(
         Settings(),
         reload=True,
+        dev_mode=True,
         session_log_file=session_file,
         log_level="WARNING",
     )
@@ -175,3 +176,22 @@ def test_reload_passa_il_log_di_sessione_al_worker(
     ]
     assert os.environ["INOLTRO_EMAIL_SESSION_LOG_FILE"] == str(session_file.resolve())
     assert os.environ["INOLTRO_EMAIL_SESSION_LOG_LEVEL"] == "WARNING"
+    assert os.environ["INOLTRO_EMAIL_DEV_MODE"] == "1"
+
+
+def test_worker_reload_ripristina_la_modalita_dev(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from inoltro_email.api import server
+
+    visto = {}
+    monkeypatch.setenv("INOLTRO_EMAIL_DEV_MODE", "1")
+    monkeypatch.setattr(
+        server,
+        "create_app",
+        lambda **kwargs: visto.update(kwargs) or object(),
+    )
+
+    server.build()
+
+    assert visto["dev_mode"] is True

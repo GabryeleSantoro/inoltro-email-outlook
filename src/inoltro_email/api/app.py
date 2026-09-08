@@ -60,6 +60,7 @@ ANALISI_SENZA_PRENOTAZIONE = 202
 MESSAGGIO_IGNORATO = 202
 MESSAGGIO_REGISTRATO = 201
 DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
+_CONTENT_BYTES_LOG_PREVIEW_CHARS = 80
 
 # Il flusso in produzione manda gli allegati come percorsi su disco: la forma
 # e' diversa da quella del connettore Outlook, il servizio le accetta entrambe.
@@ -91,11 +92,42 @@ RICHIESTA_ESEMPIO = {
 
 
 def _payload_to_log(payload: Any) -> str:
-    """Serializza un payload in modo robusto per il logging di debug."""
+    """Serializza il payload, abbreviando solo il contenuto base64 allegato."""
     try:
-        return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+        return json.dumps(
+            _truncate_content_bytes(payload),
+            ensure_ascii=False,
+            indent=2,
+            default=str,
+        )
     except Exception:  # noqa: BLE001 - non deve mai bloccare la gestione richiesta
         return repr(payload)
+
+
+def _truncate_content_bytes(value: Any) -> Any:
+    """Copia ricorsivamente il payload senza riversare il base64 intero nei log."""
+    if isinstance(value, Mapping):
+        result = {}
+        for key, item in value.items():
+            if str(key).casefold() in {"contentbytes", "contentbyte"}:
+                result[key] = _truncate_base64_for_log(item)
+            else:
+                result[key] = _truncate_content_bytes(item)
+        return result
+    if isinstance(value, list):
+        return [_truncate_content_bytes(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_truncate_content_bytes(item) for item in value)
+    return value
+
+
+def _truncate_base64_for_log(value: Any) -> Any:
+    if not isinstance(value, str) or len(value) <= _CONTENT_BYTES_LOG_PREVIEW_CHARS:
+        return value
+    return (
+        f"{value[:_CONTENT_BYTES_LOG_PREVIEW_CHARS]}... "
+        f"[troncato, totale={len(value)} caratteri]"
+    )
 
 
 def create_app(
@@ -105,6 +137,7 @@ def create_app(
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
     message_store_path: Optional[Path] = None,
+    dev_mode: bool = False,
 ) -> FastAPI:
     """Costruisce l'applicazione.
 
@@ -125,7 +158,7 @@ def create_app(
             )
         else:
             application.state.analyzer = analyzer
-        application.state.message_store = LocalMessageStore(store_path)
+        application.state.message_store = None if dev_mode else LocalMessageStore(store_path)
         application.state.email_session_report = EmailSessionReport()
 
         flow_runner: Optional[FlowRunner] = None
@@ -153,6 +186,10 @@ def create_app(
             settings.confidence.booking_threshold,
             settings.confidence.min_percent_for_ocr,
         )
+        if dev_mode:
+            logger.warning(
+                "Modalita' --dev attiva: controllo duplicati e registrazione email disattivati."
+            )
         if settings.local_files.enabled and not settings.local_files.allowed_directories:
             logger.warning(
                 "Allegati per percorso attivi senza 'local_files.allowed_directories': "
@@ -182,6 +219,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.dev_mode = dev_mode
 
     # ------------------------------------------------------------ endpoint
 
@@ -192,6 +230,7 @@ def create_app(
             "versione": __version__,
             "analisi": "/analizza-email",
             "registro": "/registra-email",
+            "modalita_sviluppo": dev_mode,
             "documentazione": "/docs",
         }
 
@@ -220,6 +259,7 @@ def create_app(
             "versione": __version__,
             "ocr_configurato": bool(settings.ocr.api_key),
             "chiave_richiesta": bool(settings.api.api_key),
+            "modalita_sviluppo": dev_mode,
         }
 
     @app.post(
@@ -270,19 +310,13 @@ def create_app(
         # Il flusso registra il messaggio soltanto dopo aver completato le
         # proprie azioni. Ai tentativi successivi il controllo deve stare qui,
         # prima dell'OCR e prima di qualunque risposta 200.
-        if request.app.state.message_store.contains(payload):
+        if not dev_mode and request.app.state.message_store.contains(payload):
             logger.info("Email gia' analizzata: %s. OCR non avviato.", email.key)
             return JSONResponse(
                 _ignored_message(email.key, email.subject, "gia_analizzata"),
                 status_code=MESSAGGIO_IGNORATO,
             )
 
-        logger.info(
-            "EMAIL RICEVUTA | id=%s | ricevuta_il=%s | da=%s | oggetto='%s' | allegati=%d",
-            email.key, email.received_at or "(data assente)",
-            email.sender or "mittente ignoto", email.subject or "(senza oggetto)",
-            len(email.attachments),
-        )
         analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
 
         stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
@@ -334,7 +368,8 @@ def create_app(
                                "stesso messaggio saranno riconosciute come duplicate.",
             },
             MESSAGGIO_IGNORATO: {
-                "description": "Messaggio gia' registrato.",
+                "description": "Messaggio gia' registrato, oppure registrazione "
+                               "saltata in modalita' --dev.",
             },
         },
         openapi_extra={
@@ -360,6 +395,27 @@ def create_app(
         """Marca un payload come gestito senza svolgere analisi o OCR."""
         _check_api_key(settings, x_api_key)
         email, payload, repairs = await _read_email_request(request, settings)
+
+        if dev_mode:
+            logger.info(
+                "MODALITA' DEV | EMAIL NON REGISTRATA | id=%s | ricevuta_il=%s | "
+                "oggetto='%s' | allegati=%d",
+                email.key, email.received_at or "(data assente)",
+                email.subject or "(senza oggetto)", len(email.attachments),
+            )
+            body = {
+                "id_messaggio": email.key,
+                "oggetto": email.subject,
+                "esito": "non_registrata_dev",
+                "registrata": False,
+                "motivo": "modalita_sviluppo",
+                "modalita_sviluppo": True,
+            }
+            if repairs:
+                body["avvisi"] = [
+                    "JSON non valido riparato in lettura: " + "; ".join(repairs)
+                ]
+            return JSONResponse(body, status_code=MESSAGGIO_IGNORATO)
 
         if not request.app.state.message_store.register(email, payload):
             logger.info("Messaggio gia' registrato: %s.", email.key)
@@ -445,6 +501,7 @@ async def _read_email_request(
 ) -> Tuple[InboundEmail, Mapping[str, Any], List[str]]:
     """Legge e valida il payload condiviso dagli endpoint email."""
     payload, repairs = await _read_json(request, settings.api.max_request_bytes)
+    logger.info("PAYLOAD JSON RICEVUTO:\n%s", _payload_to_log(payload))
     try:
         email = parse_email(
             payload,
