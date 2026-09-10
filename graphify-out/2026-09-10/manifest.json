@@ -162,9 +162,9 @@
     "semantic_hash": ""
   },
   "tests/test_cli.py": {
-    "mtime": 1789029506.9534886,
-    "seen": 1789029538.2529016,
-    "ast_hash": "6fabb08689b19d94de05df8d1047de05",
+    "mtime": 1789029264.129866,
+    "seen": 1789029439.4984767,
+    "ast_hash": "2958da810076ed7dd9e6993cb5cf1053",
     "semantic_hash": ""
   },
   "tests/test_confidence.py": {

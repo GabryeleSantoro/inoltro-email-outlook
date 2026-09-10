@@ -44,6 +44,39 @@ def test_informazioni(client: TestClient) -> None:
     assert corpo["registro"] == "/registra-email"
 
 
+def test_skip_confirmation_disattiva_attesa_popup(
+    settings: Settings,
+    ocr: FakeOcrClient,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parametri = {}
+
+    class FakeFlowRunner:
+        def __init__(self, **kwargs) -> None:
+            parametri.update(kwargs)
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+    monkeypatch.setattr("inoltro_email.api.app.FlowRunner", FakeFlowRunner)
+    analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr))
+
+    with TestClient(create_app(
+        settings,
+        analyzer=analyzer,
+        flow_path=tmp_path / "flow.lnk",
+        skip_confirmation=True,
+        message_store_path=tmp_path / "checked.sqlite3",
+    )):
+        pass
+
+    assert parametri["auto_continue"] is False
+
+
 def test_email_conforme(client: TestClient) -> None:
     payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
 

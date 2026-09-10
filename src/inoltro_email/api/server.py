@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 _SESSION_LOG_FILE_ENV = "INOLTRO_EMAIL_SESSION_LOG_FILE"
 _SESSION_LOG_LEVEL_ENV = "INOLTRO_EMAIL_SESSION_LOG_LEVEL"
 _DEV_MODE_ENV = "INOLTRO_EMAIL_DEV_MODE"
+_SKIP_CONFIRMATION_ENV = "INOLTRO_EMAIL_SKIP_CONFIRMATION"
 
 
 def _configure_reload_worker_logging() -> None:
@@ -50,7 +51,15 @@ def build() -> "object":
     dev_mode = os.environ.get(_DEV_MODE_ENV, "").strip().casefold() in {
         "1", "true", "yes", "on",
     }
-    return create_app(flow_path=flow_path, flow_timer=flow_timer, dev_mode=dev_mode)
+    skip_confirmation = os.environ.get(_SKIP_CONFIRMATION_ENV, "").strip().casefold() in {
+        "1", "true", "yes", "on",
+    }
+    return create_app(
+        flow_path=flow_path,
+        flow_timer=flow_timer,
+        dev_mode=dev_mode,
+        skip_confirmation=skip_confirmation,
+    )
 
 
 def run(
@@ -60,6 +69,7 @@ def run(
     dev_mode: bool = False,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
+    skip_confirmation: bool = False,
     session_log_file: Optional[Path] = None,
     log_level: Optional[str] = None,
 ) -> None:
@@ -81,6 +91,8 @@ def run(
             "Flusso Power Automate: '%s' ogni %d secondi.",
             flow_path, flow_timer,
         )
+        if skip_confirmation:
+            logger.info("Attesa del popup di conferma PAD saltata (--skip).")
 
     if reload:
         if dev_mode:
@@ -90,6 +102,10 @@ def run(
         if flow_path:
             os.environ["INOLTRO_EMAIL_FLOW_PATH"] = str(flow_path.resolve())
             os.environ["INOLTRO_EMAIL_FLOW_TIMER"] = str(flow_timer)
+        if skip_confirmation:
+            os.environ[_SKIP_CONFIRMATION_ENV] = "1"
+        else:
+            os.environ.pop(_SKIP_CONFIRMATION_ENV, None)
         if session_log_file:
             os.environ[_SESSION_LOG_FILE_ENV] = str(session_log_file.resolve())
             os.environ[_SESSION_LOG_LEVEL_ENV] = log_level or settings.logging.level
@@ -111,6 +127,7 @@ def run(
         flow_path=flow_path,
         flow_timer=flow_timer,
         dev_mode=dev_mode,
+        skip_confirmation=skip_confirmation,
     )
     uvicorn.run(
         app,

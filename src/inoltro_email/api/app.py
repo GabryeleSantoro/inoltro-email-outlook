@@ -136,6 +136,7 @@ def create_app(
     analyzer: Optional[EmailAnalyzer] = None,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
+    skip_confirmation: bool = False,
     message_store_path: Optional[Path] = None,
     dev_mode: bool = False,
 ) -> FastAPI:
@@ -166,7 +167,9 @@ def create_app(
             flow_runner = FlowRunner(
                 flow_path=flow_path,
                 interval_seconds=flow_timer,
-                auto_continue=settings.flow_popup.auto_continue,
+                auto_continue=(
+                    settings.flow_popup.auto_continue and not skip_confirmation
+                ),
                 popup_title=settings.flow_popup.popup_title,
                 popup_button=settings.flow_popup.popup_button,
                 popup_timeout=settings.flow_popup.popup_timeout,

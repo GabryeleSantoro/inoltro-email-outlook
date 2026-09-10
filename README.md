@@ -204,11 +204,17 @@ uv run python -m inoltro_email serve --port 9000 --reload
 # Oppure direttamente (se il venv e' attivo)
 python -m inoltro_email serve
 python -m inoltro_email serve --port 9000 --reload
+python -m inoltro_email serve --flow-path flow.lnk --skip
 # sviluppo: niente registro e nessun controllo duplicati
 python -m inoltro_email serve --dev
 # imposta l'intervallo di controllo del flow locale a 60 secondi
 python -m inoltro_email serve --flow-timer 60
 ```
+
+Con `serve --skip` (alias `--skip-confirmation`) il flow viene avviato senza
+attendere ne' cercare il popup di conferma di Power Automate Desktop. Vale solo
+per la sessione corrente; `flow_popup.auto_continue` resta l'impostazione
+persistente in `config.yaml`.
 
 Con `serve --dev` il servizio analizza ogni richiesta, anche se gia' vista, e
 `POST /registra-email` risponde senza scrivere il payload nel registro SQLite.

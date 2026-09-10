@@ -161,6 +161,7 @@ logging:
 flow_popup:
   # true = cerca e clicca "Continue" dopo l'avvio del flusso.
   # false = ignora il popup (utile per debug o se PAD non lo mostra).
+  # Per saltarlo solo nella sessione corrente: `serve --skip`.
   auto_continue: true
   # Testo (o regex) del titolo della finestra di conferma.
   popup_title: "Power Automate"

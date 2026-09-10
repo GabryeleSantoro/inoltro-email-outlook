@@ -65,6 +65,13 @@ def build_parser() -> argparse.ArgumentParser:
                        help="percorso del file .lnk del flusso Power Automate da eseguire")
     serve.add_argument("--flow-timer", type=int, default=None,
                        help="intervallo in secondi tra le esecuzioni del flusso (default: 60)")
+    serve.add_argument(
+        "--skip",
+        "--skip-confirmation",
+        dest="skip_confirmation",
+        action="store_true",
+        help="avvia il flow senza attendere o gestire il popup di conferma PAD",
+    )
 
     analizza = sub.add_parser("analizza", help="analizza un payload JSON di Power Automate")
     analizza.add_argument("path", type=Path, nargs="?", default=None,
@@ -120,6 +127,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 dev_mode=args.dev,
                 flow_path=flow_path,
                 flow_timer=flow_timer,
+                skip_confirmation=args.skip_confirmation,
                 session_log_file=log_file,
                 log_level=args.log_level or settings.logging.level,
             )
@@ -153,6 +161,7 @@ def _cmd_serve(
     dev_mode: bool = False,
     flow_path: Optional[Path] = None,
     flow_timer: int = 60,
+    skip_confirmation: bool = False,
     session_log_file: Optional[Path] = None,
     log_level: Optional[str] = None,
 ) -> int:
@@ -164,6 +173,7 @@ def _cmd_serve(
         dev_mode=dev_mode,
         flow_path=flow_path,
         flow_timer=flow_timer,
+        skip_confirmation=skip_confirmation,
         session_log_file=session_log_file,
         log_level=log_level,
     )
