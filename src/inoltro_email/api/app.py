@@ -61,6 +61,7 @@ MESSAGGIO_IGNORATO = 202
 MESSAGGIO_REGISTRATO = 201
 DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
 _CONTENT_BYTES_LOG_PREVIEW_CHARS = 80
+_BODY_LOG_PREVIEW_CHARS = 80
 
 # Il flusso in produzione manda gli allegati come percorsi su disco: la forma
 # e' diversa da quella del connettore Outlook, il servizio le accetta entrambe.
@@ -92,7 +93,7 @@ RICHIESTA_ESEMPIO = {
 
 
 def _payload_to_log(payload: Any) -> str:
-    """Serializza il payload, abbreviando solo il contenuto base64 allegato."""
+    """Serializza il payload senza riversare base64 e corpo completi nei log."""
     try:
         return json.dumps(
             _truncate_content_bytes(payload),
@@ -105,12 +106,14 @@ def _payload_to_log(payload: Any) -> str:
 
 
 def _truncate_content_bytes(value: Any) -> Any:
-    """Copia ricorsivamente il payload senza riversare il base64 intero nei log."""
+    """Copia ricorsivamente il payload, abbreviando i campi voluminosi nei log."""
     if isinstance(value, Mapping):
         result = {}
         for key, item in value.items():
             if str(key).casefold() in {"contentbytes", "contentbyte"}:
                 result[key] = _truncate_base64_for_log(item)
+            elif str(key).casefold() == "body":
+                result[key] = _truncate_body_for_log(item)
             else:
                 result[key] = _truncate_content_bytes(item)
         return result
@@ -122,12 +125,17 @@ def _truncate_content_bytes(value: Any) -> Any:
 
 
 def _truncate_base64_for_log(value: Any) -> Any:
-    if not isinstance(value, str) or len(value) <= _CONTENT_BYTES_LOG_PREVIEW_CHARS:
+    return _truncate_string_for_log(value, _CONTENT_BYTES_LOG_PREVIEW_CHARS)
+
+
+def _truncate_body_for_log(value: Any) -> Any:
+    return _truncate_string_for_log(value, _BODY_LOG_PREVIEW_CHARS)
+
+
+def _truncate_string_for_log(value: Any, limit: int) -> Any:
+    if not isinstance(value, str) or len(value) <= limit:
         return value
-    return (
-        f"{value[:_CONTENT_BYTES_LOG_PREVIEW_CHARS]}... "
-        f"[troncato, totale={len(value)} caratteri]"
-    )
+    return f"{value[:limit]}... [troncato, totale={len(value)} caratteri]"
 
 
 def create_app(

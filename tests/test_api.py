@@ -233,14 +233,15 @@ def test_registrazione_non_altera_il_riepilogo_analisi(
     assert "motivo=gia_registrato" not in log
 
 
-def test_logga_il_payload_troncando_solo_content_bytes(
+def test_logga_il_payload_troncando_content_bytes_e_body(
     client: TestClient, caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO)
     attachment = attachment_payload("foto.jpg", b"x" * 120, content_type="image/jpeg")
     content_bytes = attachment["contentBytes"]
+    body = "Corpo da troncare nel JSON. " * 10
     payload = email_payload(
-        body="Corpo originale da mostrare nel JSON.",
+        body=body,
         attachments=[{"Properties": attachment, "TypeId": "FileAttachment"}],
     )
 
@@ -249,7 +250,9 @@ def test_logga_il_payload_troncando_solo_content_bytes(
     assert risposta.status_code in {200, 202}
     log = caplog.text
     assert "PAYLOAD JSON RICEVUTO:" in log
-    assert '"body": "Corpo originale da mostrare nel JSON."' in log
+    assert '"body": "Corpo da troncare nel JSON.' in log
+    assert f"[troncato, totale={len(body)} caratteri]" in log
+    assert body not in log
     assert '"Properties": {' in log
     assert '"contentBytes": "eHh4' in log
     assert f"[troncato, totale={len(content_bytes)} caratteri]" in log
