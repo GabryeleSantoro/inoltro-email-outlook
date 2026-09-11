@@ -5,12 +5,10 @@ Servizio **HTTP** che analizza una email per volta, inviata da un flusso
 
 1. verifica che **oggetto o corpo** parlino di **telemedicina** o **televisita**;
 2. legge **PDF e immagini** allegati - i PDF direttamente quando hanno un
-   livello di testo, gli altri con l'OCR di
-   [ocr.space](https://ocr.space/ocrapi) - **restituisce il testo letto** e
+   livello di testo, gli altri con **PaddleOCR locale** - **restituisce il testo letto** e
    controlla che contenga **sia "telemedicina" sia il codice "1501A"**. Gli
    allegati possono arrivare in base64 dentro il payload oppure **come percorso
-   su disco**. Le immagini troppo grandi per l'API vengono **ridimensionate**,
-   non scartate;
+   su disco**. Nessun allegato viene inviato a servizi OCR esterni;
 3. restituisce due **percentuali di sicurezza**: quanto e' sicuro che il
    messaggio riguardi la **telemedicina** e quanto e' sicuro che sia una
    **prenotazione** di telemedicina, con l'elenco degli indizi che le hanno
@@ -52,10 +50,7 @@ Power Automate (nuova email)  --POST /analizza-email-->  registro SQLite
                         PDF leggibile? --si--> pypdf, niente OCR
                                 |no
                                 v
-                        immagine oltre 1 MB --> ridimensionata
-                                |
-                                v
-                        ocr.space (POST /parse/image)
+                         PaddleOCR locale (CPU)
                                                   |
                             criteri: "telemedicina" AND "1501A"
                                 su ogni documento, poi riassunti
@@ -90,7 +85,7 @@ Alcune scelte di funzionamento:
   dice solo "in allegato quanto richiesto" e' esattamente il caso che si vuole
   riconoscere.
 - **Il PDF si legge da solo, quando puo'.** Se ha un livello di testo, quello
-  e' il testo del documento: esatto, immediato, senza consumare quota. All'OCR
+  e' il testo del documento: esatto e immediato. All'OCR
   ci si va solo quando la lettura fallisce o non produce testo utile, cioe'
   quando il PDF e' una scansione.
 - **Solo PDF e immagini.** Fogli di calcolo, documenti Word e archivi non
@@ -98,15 +93,11 @@ Alcune scelte di funzionamento:
   i documenti della risposta e **non entrano in nessun conteggio**: un file
   chiamato `ACCESSI IN TELEMEDICINA_Maggio.xlsx` non sposta di un punto la
   sicurezza del servizio, visto che il suo contenuto resta illeggibile. Le
-  **GIF** sono escluse anche se immagini: ocr.space le rifiuta, e in una email
+  **GIF** sono escluse anche se immagini: in una email
   aziendale sono quasi sempre il logo animato della firma.
-- **Le immagini grandi si riducono, non si perdono**: una foto di impegnativa
-  scattata col telefono supera sempre il MB del piano gratuito. Viene scalata
-  per gradi finche' non rientra, conservando la risoluzione piu' alta possibile
-  perche' i caratteri restino leggibili.
 - **Chi vuole leggere di piu' o spendere di meno puo' regolarlo**:
   `ocr.always_call: true` manda all'OCR anche i PDF gia' leggibili (recupera i
-  timbri, costa una chiamata a documento); `attachments.analyze_all: false`,
+  timbri, costa calcolo locale); `attachments.analyze_all: false`,
   `screening.stop_on_failure: true` e `confidence.min_percent_for_ocr`
   riportano il servizio al comportamento parsimonioso.
 - **Le foto del corpo contano**: spesso l'impegnativa e' fotografata e incollata
@@ -125,8 +116,7 @@ Alcune scelte di funzionamento:
 ## Requisiti
 
 - **Python 3.11+** su qualsiasi sistema operativo.
-- Una chiave API di [ocr.space](https://ocr.space/ocrapi) (il piano gratuito e'
-  sufficiente per volumi contenuti).
+- Cache PaddleOCR pre-caricata sul server; prepararla con `inoltro-email prepara-ocr`.
 - Un flusso **Power Automate** che sappia raggiungere il servizio via HTTPS.
 
 ## Installazione
@@ -144,12 +134,27 @@ source .venv/bin/activate       # su Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Preparare PaddleOCR
+
+PaddleOCR deve scaricare i pesi una sola volta su una macchina con rete. La
+cache e' poi copiata sul server Windows; durante l'analisi non sono ammessi
+download o chiamate a servizi OCR esterni.
+
+```bash
+# Usa ocr.model_cache_dir da config.yaml.
+inoltro-email prepara-ocr
+```
+
+Il comando scarica i modelli `PP-OCRv5_mobile_det`,
+`latin_PP-OCRv5_mobile_rec` e quello per l'orientamento, poi esegue una
+inferenza di verifica. Sul server impostare la stessa `ocr.model_cache_dir` e
+avviare il servizio solo dopo aver copiato l'intera cache.
+
 ## Configurazione
 
 **1. `.env`** — i segreti (copiare da `.env.example`, escluso dal versionamento):
 
 ```
-OCR_SPACE_API_KEY=la-tua-chiave
 SERVICE_API_KEY=una-stringa-lunga-e-casuale
 ```
 
@@ -178,7 +183,8 @@ Le voci da rivedere subito:
 | `attachments.return_text` | restituisci nella risposta il testo letto dai documenti |
 | `attachments.max_text_chars` | quanto testo restituire per documento (`0` = tutto) |
 | `ocr.always_call` | `true` manda all'OCR anche i PDF che si leggono da soli |
-| `ocr.resize_oversized_images` | ridimensiona le immagini oltre `ocr.max_file_bytes` invece di saltarle |
+| `ocr.model_cache_dir` | cache persistente dei modelli PaddleOCR |
+| `ocr.pdf_pages_per_batch` | pagine PDF per batch locale; tutte vengono elaborate |
 | `local_files.enabled` | leggi gli allegati indicati per percorso (campo `attchment`) |
 | `local_files.allowed_directories` | cartelle da cui e' lecito leggere: da riempire se il servizio e' raggiungibile in rete |
 | `local_files.search_directories` | dove cercare il file per nome se il percorso non esiste |
@@ -188,7 +194,6 @@ Le voci da rivedere subito:
 | `confidence.min_percent_for_ocr` | sotto questa percentuale non si chiama l'OCR |
 | `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" (punteggio storico, da `0` a `1`) |
 | `api.host` / `api.port` | dove ascolta il servizio (le variabili `API_HOST` e `PORT` hanno la precedenza) |
-| `ocr.max_file_bytes` / `ocr.max_pdf_pages_per_request` | limiti del piano ocr.space |
 
 ## Avvio del servizio
 
@@ -220,14 +225,15 @@ Con `serve --dev` il servizio analizza ogni richiesta, anche se gia' vista, e
 `POST /registra-email` risponde senza scrivere il payload nel registro SQLite.
 Il flag funziona anche con `python main.py --dev` e con `--reload`.
 
-In produzione si puo' usare direttamente uvicorn con piu' processi:
+In produzione iniziare con un processo: ogni worker carica i propri modelli
+Paddle e serializza l'OCR per non saturare la CPU.
 
 ```bash
 # Con uv
-uv run uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 4
+uv run uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 1
 
 # Oppure direttamente
-uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 4
+uvicorn inoltro_email.api.server:build --factory --host 0.0.0.0 --port 8000 --workers 1
 ```
 
 Documentazione interattiva (generata dal servizio): <http://localhost:8000/docs>.
@@ -411,7 +417,7 @@ percentuali.
 
 | Campo | Significato |
 |---|---|
-| `sorgente` | `pdf_text` letto direttamente dal PDF, senza OCR; `ocr` letto da ocr.space; `pdf_text+ocr` i due testi uniti (con `ocr.always_call: true`); `skipped` non leggibile; `error` lettura fallita |
+| `sorgente` | `pdf_text` letto direttamente dal PDF, senza OCR; `ocr` letto localmente da PaddleOCR; `pdf_text+ocr` i due testi uniti (con `ocr.always_call: true`); `skipped` non leggibile; `error` lettura fallita |
 | `testo` | il testo letto, troncato a `attachments.max_text_chars`. Si esclude con `attachments.return_text: false` |
 | `nota` | cosa e' stato fatto al file prima di leggerlo, oggi il ridimensionamento di un'immagine troppo grande |
 | `conforme` | questo singolo documento contiene **tutti** i criteri |
@@ -569,7 +575,7 @@ che anche i casi intermedi passino senza revisione umana la abbassa.
      `local_files.search_directories`).
 
      > **Attenzione**: i file indicati nel payload vengono caricati su
-     > ocr.space. Se il servizio e' raggiungibile da altre macchine, riempire
+     > PaddleOCR locale. Se il servizio e' raggiungibile da altre macchine, riempire
      > `local_files.allowed_directories` con la sola cartella degli allegati:
      > senza, chiunque possa chiamare l'endpoint sceglie quali file del disco
      > (fra quelli con estensione ammessa) finiscono all'OCR. All'avvio il
@@ -652,7 +658,7 @@ configurazione o file non leggibile, `130` interruzione da tastiera.
 
 ```
 src/inoltro_email/
-├── __main__.py        riga di comando (serve | analizza | check-file)
+├── __main__.py        riga di comando (serve | analizza | check-file | prepara-ocr)
 ├── config.py          lettura e validazione di config.yaml + .env
 ├── rawjson.py         lettura tollerante del JSON non valido prodotto dal flusso
 ├── inbound.py         lettura del payload di Power Automate (HTML, base64, foto del corpo, percorsi su disco)
@@ -664,7 +670,7 @@ src/inoltro_email/
 ├── models.py          strutture dati condivise
 ├── logging_setup.py   log su console e su un file per ogni sessione
 ├── ocr/
-│   ├── ocrspace.py    client HTTP di ocr.space, con nuovi tentativi
+│   ├── paddle.py      client PaddleOCR locale, cache modelli e lock CPU
 │   └── extractor.py   scelta della strategia: livello di testo del PDF o OCR
 └── outlook/
     ├── protocol.py    interfacce usate dalla pipeline (niente Graph)
@@ -690,8 +696,7 @@ pytest
 La suite copre la lettura del payload di Power Automate (HTML, entita', base64
 malformato, foto incorporate), lo screening e i criteri, il punteggio di
 sentiment e di prenotazione, la scelta fra livello di testo del PDF e OCR, la
-suddivisione dei PDF lunghi, il client ocr.space con rete simulata (compresi i
-nuovi tentativi su HTTP 429), il flusso completo di analisi e l'endpoint HTTP
+suddivisione dei PDF lunghi, l'adapter PaddleOCR simulato, il flusso completo di analisi e l'endpoint HTTP
 con la sua autenticazione. Non serve ne' rete ne' una casella vera.
 
 ## Note operative
@@ -701,20 +706,16 @@ serve un host pubblico con HTTPS (reverse proxy, container su un servizio cloud,
 tunnel per le prove). Tenere sempre attiva `SERVICE_API_KEY` e, se possibile,
 limitare gli indirizzi IP in ingresso.
 
-**Limiti del piano gratuito di ocr.space.** File fino a 1 MB e PDF fino a 3
-pagine. I PDF piu' lunghi vengono spezzati automaticamente in blocchi da
-`ocr.max_pdf_pages_per_request` pagine; le immagini oltre il limite vengono
-saltate con un avviso nel log (non vengono ricompresse). Con un piano a pagamento
-si possono alzare `ocr.max_file_bytes` e `ocr.max_pdf_pages_per_request`.
-
-**Motore OCR.** L'engine 2 rileva la lingua da solo e in genere e' il piu'
-accurato sui documenti; se si vuole forzare l'italiano occorre impostare
-`engine: 1` (o `3`) con `language: "ita"`.
+**Motore OCR locale.** PaddleOCR usa CPU e i modelli mobili PP-OCRv5 per
+riconoscimento Latin/italiano. I PDF lunghi sono spezzati in batch da
+`ocr.pdf_pages_per_batch` pagine solo per limitare RAM: nessuna pagina viene
+scartata per quote o dimensione API.
 
 **Tempo di risposta.** L'analisi e' sincrona: la chiamata HTTP resta aperta
 finche' l'OCR non ha finito. Un PDF gia' provvisto di testo si risolve in
-millisecondi, una scansione di piu' pagine puo' richiedere decine di secondi.
-Se i volumi crescono conviene aumentare i `--workers` di uvicorn.
+millisecondi, una scansione di piu' pagine puo' richiedere secondi. Misurare
+tempo warm, p95 e RAM sul server prima di aumentare `--workers`: ogni worker
+carica i modelli in memoria.
 
 **Registro messaggi gestiti.** L'endpoint `/registra-email` conserva localmente
 lo stesso payload ricevuto da `/analizza-email`, ma solo dopo che il flusso ha
@@ -724,11 +725,9 @@ registro prima dell'analisi: una mail gia' registrata restituisce `202` con
 `motivo: gia_analizzata`, senza OCR. La registrazione resta al termine di ogni
 elaborazione riuscita del flusso.
 
-**Riservatezza.** Gli allegati vengono inviati a un servizio esterno
-(ocr.space) per il riconoscimento del testo: se contengono dati personali o
-sanitari occorre verificarne l'ammissibilita' prima di attivare il flusso in
-produzione. I PDF gia' provvisti di testo non escono mai dalla macchina, perche'
-vengono letti in locale.
+**Riservatezza.** PDF e immagini vengono elaborati da PaddleOCR nella macchina
+che ospita il servizio. I pesi vengono scaricati solo durante `prepara-ocr`;
+durante le analisi nessun contenuto sanitario esce dal server.
 
 **Dove finiscono i dati.** Allegati e foto vengono scritti in una cartella
 temporanea di sistema, rimossa al termine di ogni richiesta. Restano su disco

@@ -1,8 +1,8 @@
 # Configurazione del servizio di analisi email (telemedicina)
 # Copiare in `config.yaml` e adattare. Il file e' facoltativo: senza di esso
 # valgono i valori qui indicati come predefiniti.
-# I segreti NON vanno qui: la chiave di ocr.space e quella condivisa con Power
-# Automate stanno nel file .env (OCR_SPACE_API_KEY, SERVICE_API_KEY).
+# I segreti NON vanno qui: la chiave condivisa con Power Automate sta nel file
+# .env (SERVICE_API_KEY). PaddleOCR lavora in locale e non richiede una chiave.
 
 api:
   # 0.0.0.0 = accetta connessioni da qualsiasi interfaccia (necessario in un
@@ -45,33 +45,31 @@ rules:
   fuzzy_ocr_confusions: true
 
 ocr:
-  endpoint: "https://api.ocr.space/parse/image"
-  # 'ita' e' supportato solo dagli engine 1 e 3. L'engine 2 ignora questo campo
-  # (rileva la lingua da solo) ed e' in genere il piu' accurato sui documenti.
-  language: "ita"
-  engine: 2
-  timeout_seconds: 120
-  max_retries: 3
-  # Limiti del piano gratuito ocr.space: 1 MB per file, 3 pagine per PDF.
-  # Con un piano PRO si possono alzare (es. 5242880 e 999).
-  max_file_bytes: 1048576
-  max_pdf_pages_per_request: 3
+  # CPU e' la scelta supportata sul server Windows con grafica Radeon integrata.
+  device: "cpu"
+  # Cache persistente. Prepararla prima del deploy con `inoltro-email prepara-ocr`.
+  model_cache_dir: "C:/ProgramData/inoltro-email/models"
+  detection_model: "PP-OCRv5_mobile_det"
+  recognition_model: "latin_PP-OCRv5_mobile_rec"
+  use_doc_orientation_classify: true
+  use_doc_unwarping: false
+  use_textline_orientation: false
+  # Disabilitato: PaddlePaddle 3.3.1/oneDNN non esegue PP-OCRv5 correttamente
+  # su CPU Windows.
+  enable_mkldnn: false
+  # Tutte le pagine vengono elaborate; limita solo RAM durante un PDF lungo.
+  pdf_pages_per_batch: 10
   # false (predefinito) = un PDF che si riesce a leggere direttamente non passa
-  # dall'OCR: il suo livello di testo e' esatto e non costa nulla. All'OCR ci si
+  # dall'OCR: il suo livello di testo e' esatto e immediato. All'OCR ci si
   # va solo se la lettura fallisce o non produce testo utile (PDF scansionato).
   # true = anche i PDF leggibili passano dall'OCR e i due testi vengono uniti:
-  # recupera cio' che nel PDF e' solo immagine, al prezzo di una chiamata per
-  # ogni documento.
+  # recupera cio' che nel PDF e' solo immagine, al prezzo di calcolo locale.
   always_call: false
-  # true = un'immagine oltre max_file_bytes viene ridimensionata e inviata
-  # comunque, invece di essere saltata. Una foto di impegnativa scattata col
-  # telefono supera sempre il MB del piano gratuito.
-  resize_oversized_images: true
 
 attachments:
   # Il servizio legge solo PDF e immagini. Questo elenco puo' restringere i
   # formati, non allargarli: un'estensione non supportata viene ignorata e
-  # segnalata nei log. Le GIF sono escluse perche' ocr.space le rifiuta (e in
+  # segnalata nei log. Le GIF sono escluse perche' sono quasi sempre un logo (e in
   # una email aziendale sono quasi sempre il logo animato della firma).
   allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
   # File piu' grandi di questo vengono ignorati (byte).

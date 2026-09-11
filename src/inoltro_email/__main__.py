@@ -8,6 +8,7 @@ Tre modi d'uso:
                    punteggi senza far partire il server;
 * ``check-file`` - prova OCR e criteri su un singolo PDF o immagine, senza
                    passare da un'email.
+* ``prepara-ocr`` - scarica e verifica i modelli PaddleOCR nella cache locale.
 
 Tutti i comandi girano su qualsiasi sistema operativo: non serve Outlook, la
 posta arriva dal flusso Power Automate.
@@ -32,7 +33,7 @@ from .logging_setup import setup_logging
 from .matching import evaluate
 from .models import AttachmentFile, Esito
 from .ocr.extractor import TextExtractor
-from .ocr.ocrspace import OcrSpaceClient
+from .ocr.paddle import OcrError, PaddleOcrClient
 
 logger = logging.getLogger("inoltro_email")
 
@@ -80,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     check = sub.add_parser("check-file", help="prova OCR e criteri su un file locale")
     check.add_argument("path", type=Path, help="PDF o immagine da analizzare")
     check.add_argument("--show-text", action="store_true", help="stampa il testo estratto")
+
+    sub.add_parser(
+        "prepara-ocr",
+        help="scarica e verifica i modelli PaddleOCR nella cache configurata",
+    )
 
     return parser
 
@@ -133,8 +139,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         elif args.command == "analizza":
             exit_code = _cmd_analizza(settings, args.path)
-        else:
+        elif args.command == "check-file":
             exit_code = _cmd_check_file(settings, args.path, args.show_text)
+        else:
+            exit_code = _cmd_prepara_ocr(settings)
     except KeyboardInterrupt:
         logger.info("Interrotto dall'utente.")
         exit_code = 130
@@ -211,7 +219,7 @@ def _cmd_analizza(settings: Settings, path: Optional[Path]) -> int:
     if repairs:
         email.warnings.append("JSON non valido riparato in lettura: " + "; ".join(repairs))
 
-    with OcrSpaceClient(settings.ocr) as ocr_client:
+    with PaddleOcrClient(settings.ocr) as ocr_client:
         analyzer = EmailAnalyzer(settings, TextExtractor(settings, ocr_client))
         analysis = analyzer.analyze(email)
 
@@ -229,13 +237,13 @@ def _cmd_analizza(settings: Settings, path: Optional[Path]) -> int:
 
 
 def _cmd_check_file(settings: Settings, path: Path, show_text: bool) -> int:
-    """Analizza un singolo file locale: utile per tarare regole e chiave API."""
+    """Analizza un singolo file locale: utile per tarare regole e OCR."""
     if not path.is_file():
         print(f"File non trovato: {path}", file=sys.stderr)
         return 2
 
     attachment = AttachmentFile(path=path, original_name=path.name, size_bytes=path.stat().st_size)
-    with OcrSpaceClient(settings.ocr) as ocr_client:
+    with PaddleOcrClient(settings.ocr) as ocr_client:
         extracted = TextExtractor(settings, ocr_client).extract(attachment)
 
     print(f"\nFile      : {path}")
@@ -255,6 +263,17 @@ def _cmd_check_file(settings: Settings, path: Path, show_text: bool) -> int:
         print(extracted.text)
         print("--- fine testo ---\n")
     return 0 if report.matched else 1
+
+
+def _cmd_prepara_ocr(settings: Settings) -> int:
+    """Prepara pesi e inferenza PaddleOCR prima del deploy isolato."""
+    try:
+        PaddleOcrClient.prepare(settings.ocr)
+    except OcrError as exc:
+        print(f"Preparazione PaddleOCR fallita: {exc}", file=sys.stderr)
+        return 1
+    print(f"PaddleOCR pronto. Cache modelli: {settings.ocr.model_cache_dir.resolve()}")
+    return 0
 
 
 if __name__ == "__main__":

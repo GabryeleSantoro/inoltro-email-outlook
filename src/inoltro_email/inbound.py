@@ -22,7 +22,7 @@ una cartella e nel payload arriva soltanto il percorso, sotto la chiave
     "attchment":"C:\\Users\\user\\Documents\\Power Automate\\Allegati\\image.png"
 
 Quei percorsi sono la base per l'OCR: il file viene letto da dove si trova e
-mandato a ocr.space senza ricopiarlo.
+analizzato da PaddleOCR senza ricopiarlo.
 """
 
 from __future__ import annotations

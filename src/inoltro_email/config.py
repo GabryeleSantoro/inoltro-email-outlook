@@ -3,8 +3,8 @@
 La configurazione arriva da due sorgenti distinte:
 
 * ``config.yaml``  -> parametri di funzionamento (non segreti, versionabili);
-* variabili d'ambiente / ``.env`` -> i soli segreti: la chiave API di ocr.space
-  e la chiave che Power Automate deve presentare al servizio.
+* variabili d'ambiente / ``.env`` -> i segreti che Power Automate deve
+  presentare al servizio.
 
 Questa separazione evita che chiavi e segreti finiscano per sbaglio dentro il
 repository insieme al file di configurazione. Il file YAML e' facoltativo: se
@@ -25,7 +25,6 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-OCR_API_KEY_ENV = "OCR_SPACE_API_KEY"
 SERVICE_API_KEY_ENV = "SERVICE_API_KEY"
 HOST_ENV = "API_HOST"
 PORT_ENV = "PORT"
@@ -34,10 +33,10 @@ DEFAULT_CONFIG_PATH = Path("config.yaml")
 
 # Formati che il servizio sa leggere: documenti PDF e immagini. Tutto il resto
 # (fogli di calcolo, documenti Word, archivi) non viene nemmeno aperto: non c'e'
-# modo di ricavarne testo con l'OCR e finirebbe solo per consumare quota.
+# modo di ricavarne testo con l'OCR e finirebbe solo per consumare risorse.
 #
-# Le GIF sono escluse pur essendo immagini: ocr.space le rifiuta, e in una email
-# aziendale una GIF e' quasi sempre un logo animato della firma.
+# Le GIF sono escluse: in una email aziendale sono quasi sempre il logo animato
+# della firma, non un documento sanitario.
 FORMATI_SUPPORTATI = frozenset({".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"})
 DEFAULT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
 
@@ -89,22 +88,31 @@ class RuleSettings:
 
 @dataclass
 class OcrSettings:
-    api_key: str = ""
-    endpoint: str = "https://api.ocr.space/parse/image"
-    language: str = "ita"
-    engine: int = 2
-    timeout_seconds: int = 120
-    max_retries: int = 3
-    max_file_bytes: int = 1_048_576
-    max_pdf_pages_per_request: int = 3
+    """OCR Paddle locale. Nessun file viene inviato a servizi esterni."""
+
+    device: str = "cpu"
+    # Directory radice della cache PaddleX; i pesi stanno in
+    # ``official_models``. In produzione scegliere una directory persistente
+    # esterna al repository, per esempio C:/ProgramData/inoltro-email/models.
+    model_cache_dir: Path = Path("models/paddle")
+    # PP-OCRv5 Mobile: buon compromesso per Windows Server CPU. Il riconoscitore
+    # Latin include italiano.
+    detection_model: str = "PP-OCRv5_mobile_det"
+    recognition_model: str = "latin_PP-OCRv5_mobile_rec"
+    use_doc_orientation_classify: bool = True
+    use_doc_unwarping: bool = False
+    use_textline_orientation: bool = False
+    # PaddlePaddle 3.3.1 / oneDNN ha una regressione CPU con PP-OCRv5: restare
+    # sul backend statico senza MKL-DNN finche' il fix upstream non e' incluso.
+    enable_mkldnn: bool = False
+    # Limite operativo, non quota: evita di tenere in RAM PDF enormi tutti
+    # insieme e assicura che ogni pagina sia comunque elaborata.
+    pdf_pages_per_batch: int = 10
     # false (predefinito) = un PDF che ha il proprio livello di testo viene
     # letto in locale e non passa dall'OCR; ci si va solo se la lettura non
     # riesce o non produce testo utile. true = il PDF passa comunque dall'OCR e
-    # i due testi vengono uniti (piu' dati, molta piu' quota consumata).
+    # i due testi vengono uniti (piu' dati, piu' calcolo locale).
     always_call: bool = False
-    # true = un'immagine oltre max_file_bytes viene ridimensionata invece che
-    # saltata. Una foto di impegnativa supera sempre il MB del piano gratuito.
-    resize_oversized_images: bool = True
 
 
 @dataclass
@@ -221,8 +229,6 @@ class Settings:
     def load(
         cls,
         config_path: Optional[Path] = None,
-        *,
-        require_api_key: bool = True,
     ) -> "Settings":
         """Legge il YAML, unisce i segreti dall'ambiente e valida il tutto.
 
@@ -246,12 +252,11 @@ class Settings:
             settings = cls()
 
         settings.apply_environment()
-        settings.validate(require_api_key=require_api_key)
+        settings.validate()
         return settings
 
     def apply_environment(self) -> None:
         """Sovrascrive con l'ambiente cio' che non deve stare nel YAML."""
-        self.ocr.api_key = os.environ.get(OCR_API_KEY_ENV, "").strip()
         self.api.api_key = os.environ.get(SERVICE_API_KEY_ENV, "").strip()
         host = os.environ.get(HOST_ENV, "").strip()
         if host:
@@ -302,19 +307,28 @@ class Settings:
             fuzzy_ocr_confusions=bool(rules_raw.get("fuzzy_ocr_confusions", True)),
         )
         ocr = OcrSettings(
-            endpoint=str(ocr_raw.get("endpoint", OcrSettings.endpoint)),
-            language=str(ocr_raw.get("language", OcrSettings.language)),
-            engine=int(ocr_raw.get("engine", OcrSettings.engine)),
-            timeout_seconds=int(ocr_raw.get("timeout_seconds", OcrSettings.timeout_seconds)),
-            max_retries=int(ocr_raw.get("max_retries", OcrSettings.max_retries)),
-            max_file_bytes=int(ocr_raw.get("max_file_bytes", OcrSettings.max_file_bytes)),
-            max_pdf_pages_per_request=int(
-                ocr_raw.get("max_pdf_pages_per_request", OcrSettings.max_pdf_pages_per_request)
+            device=str(ocr_raw.get("device", OcrSettings.device)).lower(),
+            model_cache_dir=Path(str(
+                ocr_raw.get("model_cache_dir", OcrSettings.model_cache_dir)
+            )),
+            detection_model=str(ocr_raw.get("detection_model", OcrSettings.detection_model)),
+            recognition_model=str(ocr_raw.get("recognition_model", OcrSettings.recognition_model)),
+            use_doc_orientation_classify=bool(
+                ocr_raw.get("use_doc_orientation_classify", OcrSettings.use_doc_orientation_classify)
+            ),
+            use_doc_unwarping=bool(
+                ocr_raw.get("use_doc_unwarping", OcrSettings.use_doc_unwarping)
+            ),
+            use_textline_orientation=bool(
+                ocr_raw.get("use_textline_orientation", OcrSettings.use_textline_orientation)
+            ),
+            enable_mkldnn=bool(
+                ocr_raw.get("enable_mkldnn", OcrSettings.enable_mkldnn)
+            ),
+            pdf_pages_per_batch=int(
+                ocr_raw.get("pdf_pages_per_batch", OcrSettings.pdf_pages_per_batch)
             ),
             always_call=bool(ocr_raw.get("always_call", OcrSettings.always_call)),
-            resize_oversized_images=bool(
-                ocr_raw.get("resize_oversized_images", OcrSettings.resize_oversized_images)
-            ),
         )
         attachments = AttachmentSettings(
             allowed_extensions=_supported_only(
@@ -400,12 +414,7 @@ class Settings:
             flow_popup=flow_popup,
         )
 
-    def validate(self, *, require_api_key: bool = True) -> None:
-        if require_api_key and not self.ocr.api_key:
-            raise ConfigError(
-                f"Variabile d'ambiente {OCR_API_KEY_ENV} non impostata. "
-                "Copiare .env.example in .env e inserire la chiave di ocr.space."
-            )
+    def validate(self) -> None:
         if not 1 <= self.api.port <= 65535:
             raise ConfigError("api.port deve essere compreso fra 1 e 65535.")
         if self.api.max_request_bytes < 1:
@@ -418,12 +427,12 @@ class Settings:
             raise ConfigError("rules.mode deve valere 'all' oppure 'any'.")
         if not _clean(self.rules.keywords) and not _clean(self.rules.codes):
             raise ConfigError("Serve almeno una keyword o un codice in 'rules'.")
-        if self.ocr.engine not in (1, 2, 3):
-            raise ConfigError("ocr.engine deve valere 1, 2 o 3.")
-        if self.ocr.max_pdf_pages_per_request < 1:
-            raise ConfigError("ocr.max_pdf_pages_per_request deve essere >= 1.")
-        if self.ocr.max_file_bytes < 1:
-            raise ConfigError("ocr.max_file_bytes deve essere > 0.")
+        if self.ocr.device != "cpu":
+            raise ConfigError("ocr.device deve valere 'cpu': il servizio usa PaddleOCR CPU locale.")
+        if not str(self.ocr.model_cache_dir).strip():
+            raise ConfigError("ocr.model_cache_dir non puo' essere vuoto.")
+        if self.ocr.pdf_pages_per_batch < 1:
+            raise ConfigError("ocr.pdf_pages_per_batch deve essere >= 1.")
         if self.attachments.max_bytes < 1:
             raise ConfigError("attachments.max_bytes deve essere > 0.")
         if self.attachments.max_files < 1:
@@ -456,7 +465,7 @@ class Settings:
             raise ConfigError("logging.keep_sessions deve essere >= 0 (0 = conservali tutti).")
 
     def ensure_directories(self) -> None:
-        """Crea la cartella dei log: il primo avvio non fallisce."""
+        """Crea le cartelle runtime che possono nascere al primo avvio."""
         if self.logging.file:
             self.logging.file.parent.mkdir(parents=True, exist_ok=True)
 

@@ -11,12 +11,9 @@ import json
 from pathlib import Path
 
 import pytest
-import responses
 from conftest import attachment_payload, email_payload, make_pdf
 
 from inoltro_email.__main__ import main
-
-ENDPOINT = "https://api.ocr.space/parse/image"
 
 CONFIG = """
 api:
@@ -29,8 +26,7 @@ rules:
   codes: ["1501A"]
   mode: all
 ocr:
-  endpoint: "https://api.ocr.space/parse/image"
-  engine: 2
+  model_cache_dir: "models/test-paddle"
   # Nessuna chiamata di rete nei test della riga di comando: qui si usano PDF
   # che il livello di testo ce l'hanno gia'.
   always_call: false
@@ -42,10 +38,30 @@ logging:
 
 @pytest.fixture
 def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave-di-prova")
     path = tmp_path / "config.yaml"
     path.write_text(CONFIG, encoding="utf-8")
     return path
+
+
+@pytest.fixture(autouse=True)
+def paddle_finto(monkeypatch: pytest.MonkeyPatch) -> None:
+    """I comandi CLI restano unit test: non caricano pesi Paddle reali."""
+    from inoltro_email.models import OcrResult
+
+    class FakePaddle:
+        def __init__(self, *_args):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def parse_file(self, _path):
+            return OcrResult(text="", exit_code=1)
+
+    monkeypatch.setattr("inoltro_email.__main__.PaddleOcrClient", FakePaddle)
 
 
 # ------------------------------------------------------------ comando analizza
@@ -140,12 +156,25 @@ def test_check_file_su_pdf_non_conforme(config_file: Path, tmp_path: Path, capsy
     assert "non conforme" in capsys.readouterr().out
 
 
-@responses.activate
-def test_check_file_su_immagine_usa_ocr(config_file: Path, tmp_path: Path, capsys) -> None:
-    responses.add(responses.POST, ENDPOINT, status=200, json={
-        "ParsedResults": [{"ParsedText": "TELEMEDICINA cod. 15 0 1A", "FileParseExitCode": 1}],
-        "OCRExitCode": 1, "IsErroredOnProcessing": False,
-    })
+def test_check_file_su_immagine_usa_ocr(
+    config_file: Path, tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from inoltro_email.models import OcrResult
+
+    class FakePaddle:
+        def __init__(self, *_args):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def parse_file(self, _path):
+            return OcrResult(text="TELEMEDICINA cod. 15 0 1A", exit_code=1)
+
+    monkeypatch.setattr("inoltro_email.__main__.PaddleOcrClient", FakePaddle)
     image = tmp_path / "foto.png"
     image.write_bytes(b"contenuto-immagine")
 
@@ -250,7 +279,6 @@ def test_log_di_sessione_con_data_e_ora(tmp_path: Path, monkeypatch: pytest.Monk
     """Ogni avvio crea il proprio file di log, con data e ora nel nome."""
     import logging
 
-    monkeypatch.setenv("OCR_SPACE_API_KEY", "chiave-di-prova")
     logs = tmp_path / "logs"
     config = tmp_path / "config.yaml"
     config.write_text(

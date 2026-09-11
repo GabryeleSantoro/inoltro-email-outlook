@@ -10,7 +10,7 @@ from inoltro_email.config import Settings
 from inoltro_email.inbound import parse_email
 from inoltro_email.models import Esito, Origine, TextSource
 from inoltro_email.ocr.extractor import TextExtractor
-from inoltro_email.ocr.ocrspace import OcrSpaceError
+from inoltro_email.ocr.paddle import OcrError
 
 TESTO_CONFORME = "RICHIESTA DI TELEMEDICINA - prestazione 1501A"
 
@@ -138,7 +138,7 @@ def test_ocr_fallito_ripiega_sul_livello_di_testo(settings: Settings) -> None:
         calls: list = []
 
         def parse_file(self, path):
-            raise OcrSpaceError("quota giornaliera esaurita")
+            raise OcrError("motore PaddleOCR non disponibile")
 
     pdf = make_pdf(["Impegnativa per prestazione di TELEMEDICINA codice 1501A - paziente Rossi"])
     payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", pdf)])
@@ -276,7 +276,7 @@ def test_numero_massimo_di_file_rispettato(settings: Settings) -> None:
 def test_allegato_illeggibile_non_blocca_la_risposta(settings: Settings) -> None:
     class OcrRotto:
         def parse_file(self, path):
-            raise OcrSpaceError("quota giornaliera esaurita")
+            raise OcrError("motore PaddleOCR non disponibile")
 
     payload = email_payload(attachments=[attachment_payload("scansione.pdf", make_blank_pdf())])
     analyzer = EmailAnalyzer(settings, TextExtractor(settings, OcrRotto()))
@@ -284,7 +284,7 @@ def test_allegato_illeggibile_non_blocca_la_risposta(settings: Settings) -> None
 
     assert analysis.esito is Esito.SENZA_CONTENUTO
     assert analysis.attachments[0].source is TextSource.ERROR
-    assert "quota" in (analysis.attachments[0].error or "")
+    assert "PaddleOCR" in (analysis.attachments[0].error or "")
 
 
 def test_allegato_di_tipo_non_previsto_ignorato(settings: Settings) -> None:

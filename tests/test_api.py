@@ -429,7 +429,7 @@ def test_payload_non_valido_del_flusso_viene_riparato(client: TestClient) -> Non
 def test_allegato_indicato_per_percorso_arriva_all_ocr(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
-    """Il percorso del payload e' la base per l'invio a ocr.space."""
+    """Il percorso del payload e' la base per l'OCR locale."""
     impegnativa = tmp_path / "image (2).png"
     impegnativa.write_bytes(b"finta immagine")
     settings.local_files.search_directories = [tmp_path]

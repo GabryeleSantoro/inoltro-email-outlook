@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import FakeOcrClient, make_blank_pdf, make_pdf, make_photo
+from conftest import FakeOcrClient, make_blank_pdf, make_pdf
 
 from inoltro_email.config import Settings
 from inoltro_email.models import AttachmentFile, TextSource
 from inoltro_email.ocr.extractor import TextExtractor
-from inoltro_email.ocr.ocrspace import OcrSpaceError
+from inoltro_email.ocr.paddle import OcrError
 
 
 def attachment_from(path: Path) -> AttachmentFile:
@@ -82,8 +82,8 @@ def test_pdf_scansionato_passa_dall_ocr(settings: Settings, tmp_path: Path) -> N
 
 
 def test_pdf_lungo_viene_spezzato_in_blocchi(settings: Settings, tmp_path: Path) -> None:
-    """Oltre il limite di pagine del piano, il PDF va inviato a pezzi."""
-    settings.ocr.max_pdf_pages_per_request = 3
+    """PDF lungo: batch per RAM, tutte le pagine restano elaborate."""
+    settings.ocr.pdf_pages_per_batch = 3
     path = tmp_path / "lungo.pdf"
     path.write_bytes(make_blank_pdf(pages=7))
     ocr = FakeOcrClient(default_text="parte")
@@ -129,63 +129,10 @@ def test_allegato_troppo_grande_saltato(settings: Settings, tmp_path: Path) -> N
     assert "troppo grande" in (result.error or "")
 
 
-def test_immagine_oltre_il_limite_viene_ridimensionata(
-    settings: Settings, tmp_path: Path
-) -> None:
-    """Una foto di impegnativa supera sempre il MB: si riduce, non si salta."""
-    settings.ocr.max_file_bytes = 1_048_576  # il limite del piano gratuito
-    settings.attachments.max_bytes = 10_000_000
-    path = tmp_path / "foto.png"
-    path.write_bytes(make_photo())
-    assert path.stat().st_size > settings.ocr.max_file_bytes
-    ocr = FakeOcrClient(default_text="TELEMEDICINA 1501A")
-
-    result = TextExtractor(settings, ocr).extract(attachment_from(path))
-
-    assert result.source is TextSource.OCR
-    assert result.text == "TELEMEDICINA 1501A"
-    assert len(ocr.calls) == 1
-    assert result.note and "ridotta" in result.note
-    # All'OCR e' arrivato il file ridotto, non l'originale.
-    assert ocr.calls[0] != "foto.png"
-    assert ocr.sizes[0] <= settings.ocr.max_file_bytes
-
-
-def test_immagine_grande_saltata_se_il_ridimensionamento_e_disattivato(
-    settings: Settings, tmp_path: Path
-) -> None:
-    settings.ocr.max_file_bytes = 1_048_576
-    settings.ocr.resize_oversized_images = False
-    settings.attachments.max_bytes = 10_000_000
-    path = tmp_path / "foto.png"
-    path.write_bytes(make_photo())
-    ocr = FakeOcrClient()
-
-    result = TextExtractor(settings, ocr).extract(attachment_from(path))
-
-    assert result.source is TextSource.SKIPPED
-    assert ocr.calls == []
-
-
-def test_immagine_illeggibile_viene_saltata(settings: Settings, tmp_path: Path) -> None:
-    """Byte che non sono un'immagine: si salta con il motivo, senza sollevare."""
-    settings.ocr.max_file_bytes = 50
-    settings.attachments.max_bytes = 10_000
-    path = tmp_path / "rotta.png"
-    path.write_bytes(b"x" * 100)
-    ocr = FakeOcrClient()
-
-    result = TextExtractor(settings, ocr).extract(attachment_from(path))
-
-    assert result.source is TextSource.SKIPPED
-    assert result.error and "non riducibile" in result.error
-    assert ocr.calls == []
-
-
 def test_errore_ocr_non_solleva_ma_viene_registrato(settings: Settings, tmp_path: Path) -> None:
     class BrokenOcr:
         def parse_file(self, path):
-            raise OcrSpaceError("quota giornaliera esaurita")
+            raise OcrError("motore PaddleOCR non disponibile")
 
     path = tmp_path / "foto.png"
     path.write_bytes(b"contenuto")
@@ -194,7 +141,7 @@ def test_errore_ocr_non_solleva_ma_viene_registrato(settings: Settings, tmp_path
 
     assert result.source is TextSource.ERROR
     assert not result.ok
-    assert "quota" in (result.error or "")
+    assert "PaddleOCR" in (result.error or "")
 
 
 def test_pdf_con_testo_insufficiente_ricade_su_ocr(settings: Settings, tmp_path: Path) -> None:

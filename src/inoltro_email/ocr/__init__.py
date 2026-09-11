@@ -1,6 +1,6 @@
-"""Lettura del testo degli allegati (ocr.space + livello testo dei PDF)."""
+"""Lettura locale del testo degli allegati (PaddleOCR + PDF)."""
 
 from .extractor import TextExtractor
-from .ocrspace import OcrSpaceClient, OcrSpaceError
+from .paddle import OcrError, PaddleOcrClient
 
-__all__ = ["TextExtractor", "OcrSpaceClient", "OcrSpaceError"]
+__all__ = ["TextExtractor", "PaddleOcrClient", "OcrError"]

@@ -5,10 +5,9 @@ verdetto, ma salta screening e OCR se il messaggio e' gia' nel registro.
 ``POST /registra-email`` riceve lo stesso payload, ma registra solo che il
 flusso ha gia' gestito il messaggio.
 
-Il client verso ocr.space viene creato una volta sola all'avvio e chiuso allo
-spegnimento: cosi' la connessione TLS si riusa fra una richiesta e l'altra.
-L'analisi e' sincrona (l'OCR e' una chiamata di rete bloccante), quindi viene
-eseguita nel pool di thread di Starlette e non blocca il ciclo di eventi.
+Il motore PaddleOCR viene creato una volta sola all'avvio. L'analisi resta
+sincrona e viene eseguita nel pool di thread di Starlette; il client serializza
+le inferenze per non saturare la CPU del server.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from ..inbound import InboundError, parse_email
 from ..message_guard import LocalMessageStore
 from ..models import InboundEmail
 from ..ocr.extractor import TextExtractor
-from ..ocr.ocrspace import OcrSpaceClient
+from ..ocr.paddle import PaddleOcrClient
 from ..rawjson import RawJsonError, loads_tolerant
 from ..session_report import EmailSessionReport
 from .responses import analysis_to_dict
@@ -52,7 +51,7 @@ RICHIESTA_TROPPO_GRANDE = 413
 #
 # Sono due codici 2xx apposta. Power Automate considera *fallita* l'azione HTTP
 # davanti a un 4xx: il flusso finirebbe in errore e, con i tentativi automatici
-# attivi, rianalizzerebbe lo stesso messaggio consumando altra quota OCR. "Non
+# attivi, rianalizzerebbe lo stesso messaggio consumando altra CPU. "Non
 # e' una prenotazione" e' un esito legittimo dell'analisi, non un errore della
 # richiesta. Entrambe le risposte portano il verdetto completo nel corpo.
 ANALISI_CERTA = 200
@@ -150,7 +149,7 @@ def create_app(
 ) -> FastAPI:
     """Costruisce l'applicazione.
 
-    ``analyzer`` si passa solo nei test, per evitare chiamate reali a ocr.space.
+    ``analyzer`` si passa solo nei test, per evitare il caricamento dei modelli.
     """
     settings = settings or Settings.load()
     if flow_timer <= 0:
@@ -159,9 +158,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        owned_client: Optional[OcrSpaceClient] = None
+        owned_client: Optional[PaddleOcrClient] = None
         if analyzer is None:
-            owned_client = OcrSpaceClient(settings.ocr)
+            owned_client = PaddleOcrClient(settings.ocr)
             application.state.analyzer = EmailAnalyzer(
                 settings, TextExtractor(settings, owned_client)
             )
@@ -204,8 +203,8 @@ def create_app(
         if settings.local_files.enabled and not settings.local_files.allowed_directories:
             logger.warning(
                 "Allegati per percorso attivi senza 'local_files.allowed_directories': "
-                "qualunque file del disco con estensione ammessa puo' essere letto e "
-                "inviato a ocr.space. Se il servizio non e' solo in locale, indicare "
+                "qualunque file del disco con estensione ammessa puo' essere letto dal "
+                "motore OCR locale. Se il servizio non e' solo in locale, indicare "
                 "le cartelle consentite."
             )
         try:
@@ -268,7 +267,9 @@ def create_app(
         return {
             "stato": "ok",
             "versione": __version__,
-            "ocr_configurato": bool(settings.ocr.api_key),
+            "ocr_backend": "paddleocr",
+            "ocr_device": settings.ocr.device,
+            "ocr_configurato": True,
             "chiave_richiesta": bool(settings.api.api_key),
             "modalita_sviluppo": dev_mode,
         }

@@ -21,7 +21,7 @@ class TextSource(str, Enum):
     """Da dove arriva il testo di un allegato."""
 
     PDF_TEXT = "pdf_text"  # livello di testo gia' presente nel PDF
-    OCR = "ocr"  # estratto da ocr.space
+    OCR = "ocr"  # estratto da PaddleOCR locale
     PDF_TEXT_OCR = "pdf_text+ocr"  # livello di testo del PDF piu' lettura OCR
     SKIPPED = "skipped"  # allegato non analizzato (estensione/dimensione)
     ERROR = "error"  # estrazione fallita
@@ -53,7 +53,7 @@ class InboundAttachment:
     * ``content`` valorizzato -> il file viaggia in base64 dentro il payload;
     * ``source_path`` valorizzato -> il payload porta solo il percorso del file
       (campo ``attchment`` del flusso Power Automate) e il file sta gia' su
-      disco: non lo si ricopia, lo si manda all'OCR da dove si trova.
+      disco: non lo si ricopia, lo si analizza da dove si trova.
     """
 
     name: str
@@ -132,7 +132,7 @@ class AttachmentFile:
 
 @dataclass
 class OcrResult:
-    """Risposta di ocr.space per un singolo file."""
+    """Risultato OCR locale per un singolo file."""
 
     text: str
     exit_code: int
