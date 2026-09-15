@@ -138,6 +138,10 @@ class EmailAnalyzer:
         logger.info(
             "Indizi di prenotazione per '%s': %s", subject, _describe(prenotazione)
         )
+        if telemedicina.holds and prenotazione.holds and not email.attachments:
+            logger.warning(
+                "Prenotazione di televisita rilevata in '%s', ma senza allegati.", subject
+            )
         return self._result(
             email, esito, screening, sentiment,
             telemedicina=telemedicina, prenotazione=prenotazione,

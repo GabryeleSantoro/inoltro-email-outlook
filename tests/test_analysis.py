@@ -161,12 +161,14 @@ def test_manca_il_codice_nel_documento(settings: Settings) -> None:
     assert analysis.matched_attachment is None
 
 
-def test_email_senza_allegati(settings: Settings) -> None:
+def test_email_senza_allegati(settings: Settings, caplog: pytest.LogCaptureFixture) -> None:
     analysis, ocr = analizza(settings, email_payload())
 
     assert analysis.esito is Esito.SENZA_CONTENUTO
     assert analysis.attachments == []
     assert ocr.calls == []
+    assert analysis.e_prenotazione_telemedicina
+    assert "Prenotazione di televisita rilevata" in caplog.text
 
 
 def test_foto_nel_corpo_analizzata(settings: Settings) -> None:
