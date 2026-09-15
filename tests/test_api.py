@@ -97,6 +97,65 @@ def test_email_conforme(client: TestClient) -> None:
     assert corpo["id_messaggio"].startswith("<msg-")
 
 
+@pytest.mark.parametrize("recipient_field", ["tos", "ccs"])
+def test_destinatario_escluso_blocca_l_inoltro(
+    client: TestClient, recipient_field: str,
+) -> None:
+    payload = email_payload(attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())])
+    payload[recipient_field] = ["Telemedicina.Prenota@ASLSalerno.it"]
+
+    risposta = client.post("/analizza-email", json=payload)
+
+    assert risposta.status_code == 202
+    corpo = risposta.json()
+    assert corpo[recipient_field] == ["telemedicina.prenota@aslsalerno.it"]
+    assert corpo["prenotazione_certa"] is True
+    assert corpo["inoltrabile"] is False
+    assert corpo["motivo_non_inoltro"] == "destinatario_telemedicina_prenota"
+
+
+def test_altri_destinatari_non_bloccano_l_inoltro(client: TestClient) -> None:
+    payload = email_payload(
+        attachments=[attachment_payload("impegnativa.pdf", make_blank_pdf())],
+        tos=["paziente@example.com"],
+        ccs=["copia@example.com"],
+    )
+
+    risposta = client.post("/analizza-email", json=payload)
+
+    assert risposta.status_code == 200
+    corpo = risposta.json()
+    assert corpo["tos"] == ["paziente@example.com"]
+    assert corpo["ccs"] == ["copia@example.com"]
+    assert corpo["inoltrabile"] is True
+    assert corpo["motivo_non_inoltro"] is None
+
+
+def test_email_senza_allegati_non_arriva_all_analizzatore(settings: Settings) -> None:
+    class AnalyzerMustNotRun:
+        def analyze(self, _email):
+            raise AssertionError("un messaggio senza allegati non va analizzato")
+
+    with TestClient(create_app(settings, analyzer=AnalyzerMustNotRun())) as instance:
+        risposta = instance.post("/analizza-email", json=email_payload())
+
+    assert risposta.status_code == 202
+    corpo = risposta.json()
+    assert corpo["id_messaggio"].startswith("<msg-")
+    assert corpo["oggetto"] == "Richiesta prenotazione televisita"
+    assert corpo["esito"] == "ignorata"
+    assert corpo["considerata"] is False
+    assert corpo["motivo"] == "senza_allegati"
+
+
+def test_registra_email_senza_allegati_viene_ignorata(client: TestClient) -> None:
+    risposta = client.post("/registra-email", json=email_payload())
+
+    assert risposta.status_code == 202
+    assert risposta.json()["considerata"] is False
+    assert risposta.json()["motivo"] == "senza_allegati"
+
+
 def test_email_vecchia_viene_analizzata(
     settings: Settings, ocr: FakeOcrClient, tmp_path
 ) -> None:
@@ -356,7 +415,8 @@ def test_chiave_corretta_accettata(client_protetto: TestClient) -> None:
     risposta = client_protetto.post(
         "/analizza-email", json=email_payload(), headers={"X-API-Key": "chiave-condivisa"}
     )
-    assert risposta.status_code == 200
+    assert risposta.status_code == 202
+    assert risposta.json()["motivo"] == "senza_allegati"
 
 
 def test_chiave_mancante_rifiutata(client_protetto: TestClient) -> None:
@@ -419,11 +479,10 @@ def test_payload_non_valido_del_flusso_viene_riparato(client: TestClient) -> Non
         headers={"content-type": "application/json"},
     )
 
-    assert risposta.status_code == 200
+    assert risposta.status_code == 202
     corpo = risposta.json()
     assert corpo["oggetto"] == "Richiesta prenotazione televisita"
-    assert corpo["screening"]["superato"] is True
-    assert any("riparato" in avviso for avviso in corpo["avvisi"])
+    assert corpo["motivo"] == "senza_allegati"
 
 
 def test_allegato_indicato_per_percorso_arriva_all_ocr(
@@ -451,6 +510,7 @@ def test_allegato_indicato_per_percorso_arriva_all_ocr(
     assert ocr.calls == ["image (2).png"]
     assert corpo["esito"] == "conforme"
     assert corpo["documenti"][0]["nome"] == "image (2).png"
+    assert any("riparato" in avviso for avviso in corpo["avvisi"])
 
 
 def test_percentuali_nella_risposta(client: TestClient) -> None:
@@ -477,6 +537,7 @@ def test_email_di_telemedicina_che_non_e_prenotazione(
             json=email_payload(
                 subject="Accessi Telemedicina Luglio 2026 Dott.ssa Caccavo",
                 body="In allegato gli accessi in Telemedicina del mese di Luglio 2026.",
+                attachments=[attachment_payload("nota.txt", b"nota", content_type="text/plain")],
             ),
         ).json()
 
@@ -581,7 +642,7 @@ def test_duecento_solo_per_una_prenotazione_certa(client: TestClient) -> None:
 
 
 def test_duecentodue_quando_non_e_una_prenotazione(client: TestClient) -> None:
-    """Non e' un errore: e' un esito legittimo, con il verdetto nel corpo."""
+    """Senza allegati il flusso non deve considerare il messaggio."""
     risposta = client.post("/analizza-email", json=email_payload(
         subject="Accessi Telemedicina Luglio 2026",
         body="In allegato gli accessi in Telemedicina del mese.",
@@ -589,8 +650,9 @@ def test_duecentodue_quando_non_e_una_prenotazione(client: TestClient) -> None:
 
     assert risposta.status_code == 202
     corpo = risposta.json()
-    assert corpo["prenotazione_certa"] is False
-    assert corpo["telemedicina"]["percentuale"] > 0  # il verdetto c'e' comunque
+    assert corpo["esito"] == "ignorata"
+    assert corpo["considerata"] is False
+    assert corpo["motivo"] == "senza_allegati"
 
 
 def test_duecentodue_quando_la_prenotazione_e_solo_probabile(client: TestClient) -> None:
@@ -598,6 +660,7 @@ def test_duecentodue_quando_la_prenotazione_e_solo_probabile(client: TestClient)
     risposta = client.post("/analizza-email", json=email_payload(
         subject="Rinnovo piano terapeutico",
         body="Si chiede appuntamento di televisita per il rinnovo del piano terapeutico.",
+        attachments=[attachment_payload("nota.txt", b"nota", content_type="text/plain")],
     ))
 
     corpo = risposta.json()
@@ -615,6 +678,7 @@ def test_la_soglia_di_certezza_e_configurabile(
         risposta = instance.post("/analizza-email", json=email_payload(
             subject="Rinnovo piano terapeutico",
             body="Si chiede appuntamento di televisita per il rinnovo del piano terapeutico.",
+            attachments=[attachment_payload("nota.txt", b"nota", content_type="text/plain")],
         ))
 
     assert risposta.status_code == 200

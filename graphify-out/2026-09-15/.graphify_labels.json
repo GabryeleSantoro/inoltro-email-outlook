@@ -8,7 +8,7 @@
   "6": "parse_email",
   "7": "_Accumulator",
   "8": "sentiment.py",
-  "9": "MatchReport",
+  "9": "analysis.py",
   "10": "main",
   "12": "POST /analizza-email - main analysis endpoint",
   "13": "inbound.py",
@@ -37,6 +37,6 @@
   "37": "_read_path_attachments",
   "38": "config.py",
   "40": "app.py",
-  "42": "analysis.py",
+  "42": "._read_documents",
   "45": "Q: aggiungi una sezione per scartare l'attesa del conferma, ad esempio --skip"
 }

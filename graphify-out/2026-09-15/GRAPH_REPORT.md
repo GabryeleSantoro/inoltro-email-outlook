@@ -1,7 +1,7 @@
 # Graph Report - inoltro-email-outlook  (2026-09-15)
 
 ## Corpus Check
-- 50 files · ~40,198 words
+- 50 files · ~40,184 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -24,7 +24,7 @@
 - parse_email
 - _Accumulator
 - sentiment.py
-- MatchReport
+- analysis.py
 - main
 - POST /analizza-email - main analysis endpoint
 - inbound.py
@@ -53,7 +53,7 @@
 - _read_path_attachments
 - config.py
 - app.py
-- analysis.py
+- ._read_documents
 - Q: aggiungi una sezione per scartare l'attesa del conferma, ad esempio --skip
 
 ## God Nodes (most connected - your core abstractions)
@@ -126,9 +126,9 @@ Nodes (4): _Accumulator, Somma i pesi degli indizi tenendo l'elenco di cio' che 
 Cohesion: 0.13
 Nodes (27): Soglie del punteggio di sentiment e di intento di prenotazione., SentimentSettings, BookingScore, Quanto il messaggio somiglia a una prenotazione di telemedicina., analyze_sentiment(), _booking(), _clamp(), _label() (+19 more)
 
-### Community 9 - "MatchReport"
-Cohesion: 0.29
-Nodes (4): _decide(), Traduce l'esito della lettura dei documenti in un esito complessivo., MatchReport, Esito del confronto fra un testo e le regole configurate.
+### Community 9 - "analysis.py"
+Cohesion: 0.18
+Nodes (10): _aggregate(), _decide(), _extend_unique(), Orchestrazione: dall'email ricevuta al verdetto restituito. Il flusso, per ogni…, Riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero…, Traduce l'esito della lettura dei documenti in un esito complessivo., AttachmentAnalysis, MatchReport (+2 more)
 
 ### Community 10 - "main"
 Cohesion: 0.12
@@ -230,9 +230,9 @@ Nodes (53): ApiSettings, _as_str_list(), AttachmentSettings, FlowPopupSettings, 
 Cohesion: 0.05
 Nodes (45): FastAPI, JSONResponse, Request, _check_api_key(), _constant_time_equals(), _forwarding_block_reason(), _ignored_message(), _payload_to_log() (+37 more)
 
-### Community 42 - "analysis.py"
-Cohesion: 0.16
-Nodes (16): _aggregate(), _clip(), _extend_unique(), Path, Orchestrazione: dall'email ricevuta al verdetto restituito. Il flusso, per ogni…, Legge allegati e foto del corpo finche' non trova un documento conforme.…, Riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero…, Rende l'allegato un file su disco, pronto per l'OCR. Se il payload ne ha… (+8 more)
+### Community 42 - "._read_documents"
+Cohesion: 0.24
+Nodes (10): _clip(), Path, Legge allegati e foto del corpo finche' non trova un documento conforme.…, Rende l'allegato un file su disco, pronto per l'OCR. Se il payload ne ha…, Ripulisce il nome fornito dal mittente prima di scriverlo su disco., Evita che due allegati omonimi si sovrascrivano., Restituisce un'anteprima dei log senza allagare console/file., _sanitize_filename() (+2 more)
 
 ### Community 45 - "Q: aggiungi una sezione per scartare l'attesa del conferma, ad esempio --skip"
 Cohesion: 0.40

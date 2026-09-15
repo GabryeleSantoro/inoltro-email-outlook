@@ -58,6 +58,20 @@ def test_forma_graph_del_corpo_e_del_mittente() -> None:
     assert email.sender == "medico@example.com"
 
 
+def test_legge_destinatari_tos_e_ccs_in_forme_diverse() -> None:
+    email = parse_email(email_payload(
+        tos=[
+            "Paziente <paziente@example.com>",
+            {"emailAddress": {"address": "Telemedicina.Prenota@ASLSalerno.it"}},
+        ],
+        ccs={"value": [{"address": "copia@example.com"}]},
+    ))
+
+    assert email.tos == ["paziente@example.com", "telemedicina.prenota@aslsalerno.it"]
+    assert email.ccs == ["copia@example.com"]
+    assert email.recipients == email.tos + email.ccs
+
+
 def test_chiavi_con_maiuscole_accettate() -> None:
     email = parse_email({"Subject": "Telemedicina", "Body": "corpo del messaggio"})
 

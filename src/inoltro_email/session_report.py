@@ -38,9 +38,17 @@ class EmailSessionReport:
     ) -> None:
         self._add("SCARTATA", message_key, received_at, subject, reason)
 
-    def analyzed(self, email: InboundEmail, analysis: EmailAnalysis) -> SessionEmailRecord:
+    def analyzed(
+        self,
+        email: InboundEmail,
+        analysis: EmailAnalysis,
+        *,
+        forwarding_block_reason: str = "",
+    ) -> SessionEmailRecord:
         """Registra una decisione completata e restituisce la riga creata."""
-        if analysis.prenotazione_certa:
+        if forwarding_block_reason:
+            state, reason = "NON_INOLTRATA", forwarding_block_reason
+        elif analysis.prenotazione_certa:
             state, reason = "DA_INOLTRARE", "prenotazione certa"
         elif analysis.esito is Esito.SCARTATA:
             terms = ", ".join(analysis.screening.terms) or "nessun termine"

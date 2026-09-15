@@ -58,6 +58,9 @@ ANALISI_CERTA = 200
 ANALISI_SENZA_PRENOTAZIONE = 202
 MESSAGGIO_IGNORATO = 202
 MESSAGGIO_REGISTRATO = 201
+MOTIVO_SENZA_ALLEGATI = "senza_allegati"
+DESTINATARIO_ESCLUSO_DALL_INOLTRO = "telemedicina.prenota@aslsalerno.it"
+MOTIVO_DESTINATARIO_ESCLUSO = "destinatario_telemedicina_prenota"
 DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
 _CONTENT_BYTES_LOG_PREVIEW_CHARS = 80
 _BODY_LOG_PREVIEW_CHARS = 80
@@ -286,6 +289,8 @@ def create_app(
             ANALISI_SENZA_PRENOTAZIONE: {
                 "description": "Messaggio analizzato: non e' una prenotazione di "
                                "telemedicina, o non lo e' con sicurezza sufficiente. "
+                               "Include anche una prenotazione certa il cui inoltro "
+                               "e' bloccato dal destinatario. "
                                "Il verdetto completo e' nel corpo della risposta.",
             },
         },
@@ -319,6 +324,12 @@ def create_app(
                 "JSON non valido riparato in lettura: " + "; ".join(repairs)
             )
 
+        # Senza un allegato non c'e' documentazione da verificare. Il motivo
+        # stabile permette al flusso di predisporre in futuro un autoreply che
+        # chieda la ricetta, senza inviare alcun messaggio da questo servizio.
+        if not email.attachments:
+            return _without_attachments_response(request, email)
+
         # Il flusso registra il messaggio soltanto dopo aver completato le
         # proprie azioni. Ai tentativi successivi il controllo deve stare qui,
         # prima dell'OCR e prima di qualunque risposta 200.
@@ -331,8 +342,18 @@ def create_app(
 
         analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
 
-        stato = ANALISI_CERTA if analysis.prenotazione_certa else ANALISI_SENZA_PRENOTAZIONE
-        session_record = request.app.state.email_session_report.analyzed(email, analysis)
+        forwarding_block_reason = _forwarding_block_reason(email)
+        inoltrabile = forwarding_block_reason is None
+        stato = (
+            ANALISI_CERTA
+            if analysis.prenotazione_certa and inoltrabile
+            else ANALISI_SENZA_PRENOTAZIONE
+        )
+        session_record = request.app.state.email_session_report.analyzed(
+            email,
+            analysis,
+            forwarding_block_reason=forwarding_block_reason or "",
+        )
         if analysis.esito.value == "scartata":
             logger.info(
                 "EMAIL SCARTATA | motivo=screening | id=%s | ricevuta_il=%s | oggetto='%s'",
@@ -365,6 +386,10 @@ def create_app(
                 analysis,
                 include_text=settings.attachments.return_text,
                 max_text_chars=settings.attachments.max_text_chars,
+                tos=email.tos,
+                ccs=email.ccs,
+                inoltrabile=inoltrabile,
+                motivo_non_inoltro=forwarding_block_reason,
             ),
             status_code=stato,
         )
@@ -407,6 +432,9 @@ def create_app(
         """Marca un payload come gestito senza svolgere analisi o OCR."""
         _check_api_key(settings, x_api_key)
         email, payload, repairs = await _read_email_request(request, settings)
+
+        if not email.attachments:
+            return _without_attachments_response(request, email)
 
         if dev_mode:
             logger.info(
@@ -506,6 +534,31 @@ def _ignored_message(message_key: str, subject: str, reason: str) -> dict:
         "considerata": False,
         "motivo": reason,
     }
+
+
+def _without_attachments_response(request: Request, email: InboundEmail) -> JSONResponse:
+    """Scarta email senza allegati, lasciando un segnale per il flusso."""
+    request.app.state.email_session_report.discarded(
+        message_key=email.key,
+        received_at=email.received_at,
+        subject=email.subject,
+        reason="senza allegati",
+    )
+    logger.info(
+        "EMAIL SCARTATA | motivo=senza_allegati | id=%s | ricevuta_il=%s | oggetto='%s'",
+        email.key, email.received_at or "(data assente)", email.subject or "(senza oggetto)",
+    )
+    return JSONResponse(
+        _ignored_message(email.key, email.subject, MOTIVO_SENZA_ALLEGATI),
+        status_code=MESSAGGIO_IGNORATO,
+    )
+
+
+def _forwarding_block_reason(email: InboundEmail) -> Optional[str]:
+    """Restituisce il motivo che impedisce l'inoltro, altrimenti ``None``."""
+    if DESTINATARIO_ESCLUSO_DALL_INOLTRO in email.recipients:
+        return MOTIVO_DESTINATARIO_ESCLUSO
+    return None
 
 
 async def _read_email_request(

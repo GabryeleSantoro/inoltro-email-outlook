@@ -547,19 +547,6 @@
       "source_location": "L24"
     },
     {
-      "id": "src_inoltro_email_models_attachmentanalysis",
-      "label": "AttachmentAnalysis",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "code",
-      "norm_label": "attachmentanalysis",
-      "source_file": "src/inoltro_email/models.py",
-      "source_location": "L220"
-    },
-    {
       "id": "src_inoltro_email_rawjson_rawjsonerror",
       "label": "RawJsonError",
       "_callable": true,
@@ -651,13 +638,26 @@
       "source_location": "L240"
     },
     {
+      "id": "src_inoltro_email_models_attachmentanalysis",
+      "label": "AttachmentAnalysis",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "code",
+      "norm_label": "attachmentanalysis",
+      "source_file": "src/inoltro_email/models.py",
+      "source_location": "L220"
+    },
+    {
       "id": "src_inoltro_email_models_matchreport",
       "label": "MatchReport",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "code",
       "norm_label": "matchreport",
       "source_file": "src/inoltro_email/models.py",
@@ -5257,7 +5257,7 @@
       "file_type": "code",
       "norm_label": "_check_api_key()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L497"
+      "source_location": "L495"
     },
     {
       "id": "src_inoltro_email_api_app_constant_time_equals",
@@ -5269,7 +5269,7 @@
       "file_type": "code",
       "norm_label": "_constant_time_equals()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L509"
+      "source_location": "L507"
     },
     {
       "id": "src_inoltro_email_api_app_forwarding_block_reason",
@@ -5281,7 +5281,7 @@
       "file_type": "code",
       "norm_label": "_forwarding_block_reason()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L557"
+      "source_location": "L555"
     },
     {
       "id": "src_inoltro_email_api_app_ignored_message",
@@ -5293,7 +5293,7 @@
       "file_type": "code",
       "norm_label": "_ignored_message()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L528"
+      "source_location": "L526"
     },
     {
       "id": "src_inoltro_email_api_app_payload_to_log",
@@ -5317,7 +5317,7 @@
       "file_type": "code",
       "norm_label": "_payload_value()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L514"
+      "source_location": "L512"
     },
     {
       "id": "src_inoltro_email_api_app_read_email_request",
@@ -5329,7 +5329,7 @@
       "file_type": "code",
       "norm_label": "_read_email_request()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564"
+      "source_location": "L562"
     },
     {
       "id": "src_inoltro_email_api_app_read_json",
@@ -5341,7 +5341,7 @@
       "file_type": "code",
       "norm_label": "_read_json()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L587"
+      "source_location": "L585"
     },
     {
       "id": "src_inoltro_email_api_app_truncate_base64_for_log",
@@ -5401,7 +5401,7 @@
       "file_type": "code",
       "norm_label": "_without_attachments_response()",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L539"
+      "source_location": "L537"
     },
     {
       "id": "src_inoltro_email_api_server_build",
@@ -5524,24 +5524,12 @@
       "source_location": "L63"
     },
     {
-      "id": "src_inoltro_email_analysis_aggregate",
-      "label": "_aggregate()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "code",
-      "norm_label": "_aggregate()",
-      "source_file": "src/inoltro_email/analysis.py",
-      "source_location": "L372"
-    },
-    {
       "id": "src_inoltro_email_analysis_clip",
       "label": "_clip()",
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "_clip()",
       "source_file": "src/inoltro_email/analysis.py",
@@ -5553,23 +5541,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "._read_documents()",
       "source_file": "src/inoltro_email/analysis.py",
       "source_location": "L165"
-    },
-    {
-      "id": "src_inoltro_email_analysis_extend_unique",
-      "label": "_extend_unique()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "code",
-      "norm_label": "_extend_unique()",
-      "source_file": "src/inoltro_email/analysis.py",
-      "source_location": "L411"
     },
     {
       "id": "src_inoltro_email_analysis_sanitize_filename",
@@ -5577,7 +5553,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "_sanitize_filename()",
       "source_file": "src/inoltro_email/analysis.py",
@@ -5589,7 +5565,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "_unique_path()",
       "source_file": "src/inoltro_email/analysis.py",
@@ -5601,23 +5577,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "_write_to_disk()",
       "source_file": "src/inoltro_email/analysis.py",
       "source_location": "L435"
-    },
-    {
-      "id": "src_inoltro_email_models_attachmentanalysis_matched",
-      "label": ".matched()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "code",
-      "norm_label": ".matched()",
-      "source_file": "src/inoltro_email/models.py",
-      "source_location": "L235"
     },
     {
       "id": "src_inoltro_email_rawjson_as_list",
@@ -6508,16 +6472,52 @@
       "source_location": "L52"
     },
     {
+      "id": "src_inoltro_email_analysis_aggregate",
+      "label": "_aggregate()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "code",
+      "norm_label": "_aggregate()",
+      "source_file": "src/inoltro_email/analysis.py",
+      "source_location": "L372"
+    },
+    {
       "id": "src_inoltro_email_analysis_decide",
       "label": "_decide()",
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "code",
       "norm_label": "_decide()",
       "source_file": "src/inoltro_email/analysis.py",
       "source_location": "L417"
+    },
+    {
+      "id": "src_inoltro_email_analysis_extend_unique",
+      "label": "_extend_unique()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "code",
+      "norm_label": "_extend_unique()",
+      "source_file": "src/inoltro_email/analysis.py",
+      "source_location": "L411"
+    },
+    {
+      "id": "src_inoltro_email_models_attachmentanalysis_matched",
+      "label": ".matched()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "code",
+      "norm_label": ".matched()",
+      "source_file": "src/inoltro_email/models.py",
+      "source_location": "L235"
     },
     {
       "id": "src_inoltro_email_models_matchreport_found",
@@ -6525,7 +6525,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "code",
       "norm_label": ".found()",
       "source_file": "src/inoltro_email/models.py",
@@ -6537,7 +6537,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "code",
       "norm_label": ".missing()",
       "source_file": "src/inoltro_email/models.py",
@@ -6549,7 +6549,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "code",
       "norm_label": ".summary()",
       "source_file": "src/inoltro_email/models.py",
@@ -10162,7 +10162,7 @@
       "source_location": "L111"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_498",
+      "id": "src_inoltro_email_api_app_rationale_496",
       "label": "Confronto della chiave condivisa con Power Automate.",
       "_origin": "ast",
       "community": 40,
@@ -10170,10 +10170,10 @@
       "file_type": "rationale",
       "norm_label": "confronto della chiave condivisa con power automate.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L498"
+      "source_location": "L496"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_510",
+      "id": "src_inoltro_email_api_app_rationale_508",
       "label": "Confronto a tempo costante: non rivela quanti caratteri combaciano.",
       "_origin": "ast",
       "community": 40,
@@ -10181,10 +10181,10 @@
       "file_type": "rationale",
       "norm_label": "confronto a tempo costante: non rivela quanti caratteri combaciano.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L510"
+      "source_location": "L508"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_515",
+      "id": "src_inoltro_email_api_app_rationale_513",
       "label": "Legge pochi campi del JSON senza costruire l'email o gli allegati.",
       "_origin": "ast",
       "community": 40,
@@ -10192,10 +10192,10 @@
       "file_type": "rationale",
       "norm_label": "legge pochi campi del json senza costruire l'email o gli allegati.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L515"
+      "source_location": "L513"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_529",
+      "id": "src_inoltro_email_api_app_rationale_527",
       "label": "Risposta 2xx: il flow puo' ignorarla senza ritentare la HTTP action.",
       "_origin": "ast",
       "community": 40,
@@ -10203,10 +10203,10 @@
       "file_type": "rationale",
       "norm_label": "risposta 2xx: il flow puo' ignorarla senza ritentare la http action.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L529"
+      "source_location": "L527"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_540",
+      "id": "src_inoltro_email_api_app_rationale_538",
       "label": "Scarta email senza allegati, lasciando un segnale per il flusso.",
       "_origin": "ast",
       "community": 40,
@@ -10214,10 +10214,10 @@
       "file_type": "rationale",
       "norm_label": "scarta email senza allegati, lasciando un segnale per il flusso.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L540"
+      "source_location": "L538"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_558",
+      "id": "src_inoltro_email_api_app_rationale_556",
       "label": "Restituisce il motivo che impedisce l'inoltro, altrimenti ``None``.",
       "_origin": "ast",
       "community": 40,
@@ -10225,10 +10225,10 @@
       "file_type": "rationale",
       "norm_label": "restituisce il motivo che impedisce l'inoltro, altrimenti ``none``.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L558"
+      "source_location": "L556"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_567",
+      "id": "src_inoltro_email_api_app_rationale_565",
       "label": "Legge e valida il payload condiviso dagli endpoint email.",
       "_origin": "ast",
       "community": 40,
@@ -10236,10 +10236,10 @@
       "file_type": "rationale",
       "norm_label": "legge e valida il payload condiviso dagli endpoint email.",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L567"
+      "source_location": "L565"
     },
     {
-      "id": "src_inoltro_email_api_app_rationale_588",
+      "id": "src_inoltro_email_api_app_rationale_586",
       "label": "Legge il corpo della richiesta e lo interpreta. Restituisce ``(payload,\u2026",
       "_origin": "ast",
       "community": 40,
@@ -10247,7 +10247,7 @@
       "file_type": "rationale",
       "norm_label": "legge il corpo della richiesta e lo interpreta. restituisce ``(payload,...",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L588"
+      "source_location": "L586"
     },
     {
       "id": "src_inoltro_email_api_app_rationale_98",
@@ -10382,66 +10382,33 @@
       "source_location": "L83"
     },
     {
-      "id": "src_inoltro_email_analysis",
-      "label": "analysis.py",
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "code",
-      "norm_label": "analysis.py",
-      "source_file": "src/inoltro_email/analysis.py",
-      "source_location": "L1"
-    },
-    {
       "id": "src_inoltro_email_analysis_py_path",
       "label": "Path",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "code",
       "norm_label": "path",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "src_inoltro_email_analysis_rationale_1",
-      "label": "Orchestrazione: dall'email ricevuta al verdetto restituito. Il flusso, per ogni\u2026",
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "rationale",
-      "norm_label": "orchestrazione: dall'email ricevuta al verdetto restituito. il flusso, per ogni...",
-      "source_file": "src/inoltro_email/analysis.py",
-      "source_location": "L1"
-    },
-    {
       "id": "src_inoltro_email_analysis_rationale_168",
       "label": "Legge allegati e foto del corpo finche' non trova un documento conforme.\u2026",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "rationale",
       "norm_label": "legge allegati e foto del corpo finche' non trova un documento conforme....",
       "source_file": "src/inoltro_email/analysis.py",
       "source_location": "L168"
     },
     {
-      "id": "src_inoltro_email_analysis_rationale_373",
-      "label": "Riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero\u2026",
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "rationale",
-      "norm_label": "riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero...",
-      "source_file": "src/inoltro_email/analysis.py",
-      "source_location": "L373"
-    },
-    {
       "id": "src_inoltro_email_analysis_rationale_436",
       "label": "Rende l'allegato un file su disco, pronto per l'OCR. Se il payload ne ha\u2026",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "rationale",
       "norm_label": "rende l'allegato un file su disco, pronto per l'ocr. se il payload ne ha...",
       "source_file": "src/inoltro_email/analysis.py",
@@ -10452,7 +10419,7 @@
       "label": "Ripulisce il nome fornito dal mittente prima di scriverlo su disco.",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "rationale",
       "norm_label": "ripulisce il nome fornito dal mittente prima di scriverlo su disco.",
       "source_file": "src/inoltro_email/analysis.py",
@@ -10463,7 +10430,7 @@
       "label": "Evita che due allegati omonimi si sovrascrivano.",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "rationale",
       "norm_label": "evita che due allegati omonimi si sovrascrivano.",
       "source_file": "src/inoltro_email/analysis.py",
@@ -10474,22 +10441,11 @@
       "label": "Restituisce un'anteprima dei log senza allagare console/file.",
       "_origin": "ast",
       "community": 42,
-      "community_name": "analysis.py",
+      "community_name": "._read_documents",
       "file_type": "rationale",
       "norm_label": "restituisce un'anteprima dei log senza allagare console/file.",
       "source_file": "src/inoltro_email/analysis.py",
       "source_location": "L52"
-    },
-    {
-      "id": "src_inoltro_email_models_rationale_221",
-      "label": "Esito della lettura di un singolo allegato o di una foto del corpo.",
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "analysis.py",
-      "file_type": "rationale",
-      "norm_label": "esito della lettura di un singolo allegato o di una foto del corpo.",
-      "source_file": "src/inoltro_email/models.py",
-      "source_location": "L221"
     },
     {
       "id": "graphify_out_memory_query_20260910_083917_aggiungi_una_sezione_per_scartare_l_attesa_del_con",
@@ -11011,11 +10967,44 @@
       "source_location": "L40"
     },
     {
+      "id": "src_inoltro_email_analysis",
+      "label": "analysis.py",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "code",
+      "norm_label": "analysis.py",
+      "source_file": "src/inoltro_email/analysis.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_analysis_rationale_1",
+      "label": "Orchestrazione: dall'email ricevuta al verdetto restituito. Il flusso, per ogni\u2026",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "rationale",
+      "norm_label": "orchestrazione: dall'email ricevuta al verdetto restituito. il flusso, per ogni...",
+      "source_file": "src/inoltro_email/analysis.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_inoltro_email_analysis_rationale_373",
+      "label": "Riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero\u2026",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "rationale",
+      "norm_label": "riassume i criteri trovati su *tutti* i documenti letti. ``matched`` resta vero...",
+      "source_file": "src/inoltro_email/analysis.py",
+      "source_location": "L373"
+    },
+    {
       "id": "src_inoltro_email_analysis_rationale_418",
       "label": "Traduce l'esito della lettura dei documenti in un esito complessivo.",
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "rationale",
       "norm_label": "traduce l'esito della lettura dei documenti in un esito complessivo.",
       "source_file": "src/inoltro_email/analysis.py",
@@ -11026,11 +11015,22 @@
       "label": "Esito del confronto fra un testo e le regole configurate.",
       "_origin": "ast",
       "community": 9,
-      "community_name": "MatchReport",
+      "community_name": "analysis.py",
       "file_type": "rationale",
       "norm_label": "esito del confronto fra un testo e le regole configurate.",
       "source_file": "src/inoltro_email/models.py",
       "source_location": "L170"
+    },
+    {
+      "id": "src_inoltro_email_models_rationale_221",
+      "label": "Esito della lettura di un singolo allegato o di una foto del corpo.",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "analysis.py",
+      "file_type": "rationale",
+      "norm_label": "esito della lettura di un singolo allegato o di una foto del corpo.",
+      "source_file": "src/inoltro_email/models.py",
+      "source_location": "L221"
     },
     {
       "id": "concept_1501a",
@@ -11847,7 +11847,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L502",
+      "source_location": "L500",
       "weight": 1.0
     },
     {
@@ -11955,7 +11955,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L385",
+      "source_location": "L383",
       "weight": 1.0
     },
     {
@@ -11979,7 +11979,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L568",
+      "source_location": "L566",
       "weight": 1.0
     },
     {
@@ -11991,7 +11991,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L569",
+      "source_location": "L567",
       "weight": 1.0
     },
     {
@@ -12003,7 +12003,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L571",
+      "source_location": "L569",
       "weight": 1.0
     },
     {
@@ -12015,7 +12015,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L612",
+      "source_location": "L610",
       "weight": 1.0
     },
     {
@@ -12075,7 +12075,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L551",
+      "source_location": "L549",
       "weight": 1.0
     },
     {
@@ -12087,7 +12087,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L552",
+      "source_location": "L550",
       "weight": 1.0
     },
     {
@@ -21159,7 +21159,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564",
+      "source_location": "L562",
       "weight": 1.0
     },
     {
@@ -21171,7 +21171,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564",
+      "source_location": "L562",
       "weight": 1.0
     },
     {
@@ -21183,7 +21183,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L587",
+      "source_location": "L585",
       "weight": 1.0
     },
     {
@@ -24363,7 +24363,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L497",
+      "source_location": "L495",
       "weight": 1.0
     },
     {
@@ -24375,7 +24375,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L557",
+      "source_location": "L555",
       "weight": 1.0
     },
     {
@@ -24399,7 +24399,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L514",
+      "source_location": "L512",
       "weight": 1.0
     },
     {
@@ -24411,7 +24411,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564",
+      "source_location": "L562",
       "weight": 1.0
     },
     {
@@ -24423,7 +24423,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564",
+      "source_location": "L562",
       "weight": 1.0
     },
     {
@@ -24435,7 +24435,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L587",
+      "source_location": "L585",
       "weight": 1.0
     },
     {
@@ -24447,7 +24447,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L539",
+      "source_location": "L537",
       "weight": 1.0
     },
     {
@@ -24459,7 +24459,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L539",
+      "source_location": "L537",
       "weight": 1.0
     },
     {
@@ -26909,7 +26909,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L497",
+      "source_location": "L495",
       "weight": 1.0
     },
     {
@@ -26920,7 +26920,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L509",
+      "source_location": "L507",
       "weight": 1.0
     },
     {
@@ -26931,7 +26931,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L514",
+      "source_location": "L512",
       "weight": 1.0
     },
     {
@@ -26942,7 +26942,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L528",
+      "source_location": "L526",
       "weight": 1.0
     },
     {
@@ -26953,7 +26953,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L539",
+      "source_location": "L537",
       "weight": 1.0
     },
     {
@@ -26964,7 +26964,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L557",
+      "source_location": "L555",
       "weight": 1.0
     },
     {
@@ -26975,7 +26975,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L564",
+      "source_location": "L562",
       "weight": 1.0
     },
     {
@@ -26986,7 +26986,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L587",
+      "source_location": "L585",
       "weight": 1.0
     },
     {
@@ -32985,91 +32985,91 @@
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_498",
+      "source": "src_inoltro_email_api_app_rationale_496",
       "target": "src_inoltro_email_api_app_check_api_key",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L498",
+      "source_location": "L496",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_510",
+      "source": "src_inoltro_email_api_app_rationale_508",
       "target": "src_inoltro_email_api_app_constant_time_equals",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L510",
+      "source_location": "L508",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_515",
+      "source": "src_inoltro_email_api_app_rationale_513",
       "target": "src_inoltro_email_api_app_payload_value",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L515",
+      "source_location": "L513",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_529",
+      "source": "src_inoltro_email_api_app_rationale_527",
       "target": "src_inoltro_email_api_app_ignored_message",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L529",
+      "source_location": "L527",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_540",
+      "source": "src_inoltro_email_api_app_rationale_538",
       "target": "src_inoltro_email_api_app_without_attachments_response",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L540",
+      "source_location": "L538",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_558",
+      "source": "src_inoltro_email_api_app_rationale_556",
       "target": "src_inoltro_email_api_app_forwarding_block_reason",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L558",
+      "source_location": "L556",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_567",
+      "source": "src_inoltro_email_api_app_rationale_565",
       "target": "src_inoltro_email_api_app_read_email_request",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L567",
+      "source_location": "L565",
       "weight": 1.0
     },
     {
-      "source": "src_inoltro_email_api_app_rationale_588",
+      "source": "src_inoltro_email_api_app_rationale_586",
       "target": "src_inoltro_email_api_app_read_json",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/inoltro_email/api/app.py",
-      "source_location": "L588",
+      "source_location": "L586",
       "weight": 1.0
     },
     {

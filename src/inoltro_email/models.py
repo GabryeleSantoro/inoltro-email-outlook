@@ -100,6 +100,9 @@ class InboundEmail:
     internet_message_id: str = ""
     sender: str = ""
     received_at: str = ""
+    # Destinatari estratti dai campi ``tos`` e ``ccs`` del flusso.
+    tos: List[str] = field(default_factory=list)
+    ccs: List[str] = field(default_factory=list)
     attachments: List[InboundAttachment] = field(default_factory=list)
     # Problemi non bloccanti trovati nel payload: percorsi di allegati non
     # raggiungibili, corpo non risolto dal flusso, riparazioni al JSON.
@@ -114,6 +117,11 @@ class InboundEmail:
     def screening_text(self) -> str:
         """Oggetto e corpo insieme: e' cio' su cui si fa la prima verifica."""
         return f"{self.subject}\n{self.body_text}".strip()
+
+    @property
+    def recipients(self) -> List[str]:
+        """Destinatari principali e in copia, in ordine di arrivo."""
+        return self.tos + self.ccs
 
 
 @dataclass

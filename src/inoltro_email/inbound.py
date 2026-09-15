@@ -8,6 +8,7 @@ e Microsoft Graph, quindi qui si accettano entrambe le forme:
     subject / Subject
     body / bodyHtml / bodyContent / bodyPreview, come stringa o {content, contentType}
     from  come stringa oppure {emailAddress: {address}}
+    tos / ccs come stringhe, elenchi o oggetti Outlook/Graph
     attachments[*].contentBytes / content / contentBase64 (base64), anche
     quando Power Automate Desktop annida l'allegato in ``Properties``
 
@@ -56,6 +57,7 @@ _DATA_URI = re.compile(r"^data:([\w./+-]+)?;base64,(.*)$", re.IGNORECASE | re.DO
 _WHITESPACE = re.compile(r"[ \t\x0b\f\r\xa0]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
 _LOOKS_LIKE_HTML = re.compile(r"<(?:html|body|div|p|br|table|span|img)\b", re.IGNORECASE)
+_EMAIL_ADDRESS = re.compile(r"[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+", re.IGNORECASE)
 
 # Tag che, chiudendosi, introducono un a capo nel testo semplice.
 _BLOCK_TAGS = {
@@ -150,6 +152,8 @@ def parse_email(
         received_at=_as_text(
             data.get("receivedDateTime") or data.get("received") or data.get("date")
         ),
+        tos=_read_recipients(data.get("tos") or data.get("toRecipients")),
+        ccs=_read_recipients(data.get("ccs") or data.get("ccRecipients")),
         attachments=attachments,
         warnings=warnings,
     )
@@ -543,6 +547,30 @@ def _read_sender(data: "_CaseInsensitive") -> str:
             if found:
                 return found
     return ""
+
+
+def _read_recipients(value: Any) -> List[str]:
+    """Estrae indirizzi da forme semplici e annidate del payload Outlook."""
+    found: List[str] = []
+
+    def visit(item: Any) -> None:
+        if isinstance(item, Mapping):
+            for nested in item.values():
+                visit(nested)
+            return
+        if isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+            for nested in item:
+                visit(nested)
+            return
+        if not isinstance(item, str):
+            return
+        for match in _EMAIL_ADDRESS.findall(item):
+            address = match.casefold()
+            if address not in found:
+                found.append(address)
+
+    visit(value)
+    return found
 
 
 def _as_text(value: Any) -> str:

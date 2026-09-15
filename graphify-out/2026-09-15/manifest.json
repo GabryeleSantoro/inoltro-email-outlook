@@ -48,9 +48,9 @@
     "semantic_hash": "f0959a9a9a00fa996ae03dfa369db1ae"
   },
   "src/inoltro_email/api/app.py": {
-    "mtime": 1789463583.9856055,
-    "seen": 1789463606.9874492,
-    "ast_hash": "aa46b09c10ae14fdd30a1a175228d1f7",
+    "mtime": 1789463510.7686467,
+    "seen": 1789463568.4946027,
+    "ast_hash": "dae1e759769b7cbd4b0e9c89c2ae24ff",
     "semantic_hash": ""
   },
   "src/inoltro_email/api/responses.py": {

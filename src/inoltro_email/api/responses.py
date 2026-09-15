@@ -20,6 +20,10 @@ def analysis_to_dict(
     *,
     include_text: bool = True,
     max_text_chars: int = 0,
+    tos: Optional[List[str]] = None,
+    ccs: Optional[List[str]] = None,
+    inoltrabile: bool = True,
+    motivo_non_inoltro: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Rappresentazione JSON completa del verdetto.
 
@@ -31,6 +35,8 @@ def analysis_to_dict(
     return {
         "id_messaggio": analysis.message_key,
         "oggetto": analysis.subject,
+        "tos": tos or [],
+        "ccs": ccs or [],
         "considerata": True,
         "esito": analysis.esito.value,
         "conforme": analysis.conforme,
@@ -39,6 +45,10 @@ def analysis_to_dict(
         "prenotazione_telemedicina": analysis.e_prenotazione_telemedicina,
         # Vero solo oltre la soglia di certezza: e' cio' che fa rispondere 200.
         "prenotazione_certa": analysis.prenotazione_certa,
+        # Decisione operativa separata dal punteggio clinico: un destinatario
+        # escluso puo' impedire l'inoltro anche con prenotazione certa.
+        "inoltrabile": inoltrabile,
+        "motivo_non_inoltro": motivo_non_inoltro,
         "telemedicina": confidence_to_dict(analysis.telemedicina),
         "prenotazione": confidence_to_dict(analysis.prenotazione),
         "screening": {
