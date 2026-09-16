@@ -1,169 +1,50 @@
-# Configurazione del servizio di analisi email (telemedicina)
-# Copiare in `config.yaml` e adattare. Il file e' facoltativo: senza di esso
-# valgono i valori qui indicati come predefiniti.
-# I segreti NON vanno qui: la chiave condivisa con Power Automate sta nel file
-# .env (SERVICE_API_KEY). PaddleOCR lavora in locale e non richiede una chiave.
+# Template configurazione servizio analisi email.
+# Copiare in config.yaml e adattare. Parametri omessi usano i default del servizio.
+# Segreti solo in .env: SERVICE_API_KEY.
 
 api:
-  # 0.0.0.0 = accetta connessioni da qualsiasi interfaccia (necessario in un
-  # container). Le variabili d'ambiente API_HOST e PORT hanno la precedenza.
   host: "0.0.0.0"
   port: 8000
-  # Corpo massimo della richiesta: gli allegati arrivano in base64, quindi
-  # occupano circa 4/3 della loro dimensione reale.
   max_request_bytes: 33554432
-  title: "Servizio telemedicina - analisi email"
 
-# Prima verifica, su oggetto e corpo del messaggio. Se non la supera, l'email
-# non viene nemmeno passata all'OCR.
+# Termini cercati in oggetto e corpo prima dell'analisi degli allegati.
 screening:
-  keywords:
-    - "telemedicina"
-    - "televisita"
-  # any = basta uno dei termini (telemedicina OPPURE televisita)
-  # all = servono tutti
+  keywords: ["telemedicina", "televisita"]
   mode: "any"
-  # false (predefinito) = gli allegati si leggono comunque, anche se oggetto e
-  # corpo non parlano di telemedicina: il contenuto di un'impegnativa puo'
-  # ribaltare un oggetto che non dice nulla, e il verdetto si vuole con tutti i
-  # dati alla mano. true = niente OCR se lo screening non passa (risparmia
-  # quota, ma perde i messaggi con l'oggetto generico).
-  stop_on_failure: false
 
-# Criteri che deve soddisfare il testo letto dagli allegati e dalle foto.
+# Criteri richiesti in ricetta/impegnativa.
 rules:
-  keywords:
-    - "telemedicina"
-  # Codici: confronto tollerante a spazi e separatori (15 0 1A, 15-01A, ...).
-  codes:
-    - "1501A"
-  # all = servono TUTTE le keyword E TUTTI i codici (AND)
-  # any = ne basta uno qualsiasi (OR)
+  keywords: ["telemedicina"]
+  codes: ["1501A"]
   mode: "all"
-  # Corregge le confusioni tipiche dell'OCR sui codici (O/0, I/1, L/1, S/5, B/8).
-  # Non viene mai applicato alle keyword.
   fuzzy_ocr_confusions: true
 
 ocr:
-  # CPU e' la scelta supportata sul server Windows con grafica Radeon integrata.
-  device: "cpu"
-  # Cache persistente. Prepararla prima del deploy con `inoltro-email prepara-ocr`.
+  # Cache persistente dei modelli PaddleOCR.
   model_cache_dir: "C:/ProgramData/inoltro-email/models"
-  detection_model: "PP-OCRv5_mobile_det"
-  recognition_model: "latin_PP-OCRv5_mobile_rec"
-  use_doc_orientation_classify: true
-  use_doc_unwarping: false
-  use_textline_orientation: false
-  # Disabilitato: PaddlePaddle 3.3.1/oneDNN non esegue PP-OCRv5 correttamente
-  # su CPU Windows.
-  enable_mkldnn: false
-  # Tutte le pagine vengono elaborate; limita solo RAM durante un PDF lungo.
-  pdf_pages_per_batch: 10
-  # false (predefinito) = un PDF che si riesce a leggere direttamente non passa
-  # dall'OCR: il suo livello di testo e' esatto e immediato. All'OCR ci si
-  # va solo se la lettura fallisce o non produce testo utile (PDF scansionato).
-  # true = anche i PDF leggibili passano dall'OCR e i due testi vengono uniti:
-  # recupera cio' che nel PDF e' solo immagine, al prezzo di calcolo locale.
-  always_call: false
 
 attachments:
-  # Il servizio legge solo PDF e immagini. Questo elenco puo' restringere i
-  # formati, non allargarli: un'estensione non supportata viene ignorata e
-  # segnalata nei log. Le GIF sono escluse perche' sono quasi sempre un logo (e in
-  # una email aziendale sono quasi sempre il logo animato della firma).
-  allowed_extensions: [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
-  # File piu' grandi di questo vengono ignorati (byte).
-  max_bytes: 10485760
-  # Analizza anche le foto incorporate nel corpo (allegati inline e immagini
-  # "data:" dentro l'HTML): spesso l'impegnativa e' fotografata nel messaggio.
+  # Foto incorporate nel corpo: spesso contengono la ricetta.
   include_inline_images: true
-  # Quanti file al massimo passare all'OCR per ogni email.
-  max_files: 10
-  # true (predefinito) = si leggono tutti i file allegati, anche dopo averne
-  # trovato uno conforme: il verdetto tiene conto di tutto quello che e'
-  # arrivato. false = ci si ferma al primo conforme (meno chiamate all'OCR).
-  analyze_all: true
-  # Restituisce nella risposta il testo letto da ogni documento. E' un dato
-  # sanitario: chi non lo vuole in giro lo mette a false.
+  # Il testo OCR e' un dato sanitario: impostare false se non serve nella risposta.
   return_text: true
-  # Quanto testo restituire per documento (0 = tutto). Serve solo a non far
-  # esplodere la risposta con un referto di venti pagine.
   max_text_chars: 20000
 
-# Allegati che il flusso non manda in base64 ma indica con il percorso su disco
-# (campo "attchment" del payload). Quei percorsi sono la base per l'OCR: il file
-# viene letto da dove si trova, senza ricopiarlo.
+# Usato quando Power Automate passa un percorso locale nel campo "attchment".
 local_files:
   enabled: true
-  # Se valorizzato, si accettano SOLO percorsi dentro queste cartelle. Da
-  # riempire quando il servizio e' raggiungibile da altre macchine: evita che un
-  # payload possa far leggere un file qualsiasi del disco.
-  # allowed_directories:
-  #   - "C:/Users/user/Documents/Power Automate/Allegati"
-  # Dove cercare il file per nome se il percorso indicato non esiste (serve se
-  # il servizio gira su una macchina diversa da quella del flusso).
-  # search_directories:
-  #   - "/srv/allegati"
+  # In produzione indicare solo cartelle dedicate agli allegati.
   allowed_directories: []
   search_directories: []
 
-# Percentuali di sicurezza restituite nella risposta.
 confidence:
-  # Sopra questa percentuale il messaggio e' considerato di telemedicina
-  # ("telemedicina.confermato" nella risposta).
-  telemedicine_threshold: 50
-  # Sopra questa percentuale e' considerato una prenotazione di telemedicina.
-  # Insieme alla precedente determina "prenotazione_telemedicina".
-  booking_threshold: 60
-  # Sotto questa percentuale, calcolata prima dell'OCR su oggetto, corpo e nomi
-  # dei file, non si spende una chiamata all'OCR. Zero (predefinito) = si legge
-  # sempre tutto. Alzandola si risparmia quota su newsletter e fogli di accessi,
-  # al prezzo di non vedere il contenuto dei loro allegati.
-  min_percent_for_ocr: 0
-  # Sopra questa percentuale la prenotazione e' considerata *certa*: e' cio' che
-  # fa rispondere 200 invece di 202. Deve stare sopra booking_threshold.
-  # Alzandola si risponde 200 solo ai casi lampanti, abbassandola si accettano
-  # piu' messaggi senza revisione umana.
+  # Soglia per considerare certa la prenotazione.
   certainty_threshold: 80
-  # Taratura fine: sono i termini costanti dei due punteggi, in log-odds. Piu'
-  # sono negativi, piu' indizi servono per arrivare a una percentuale alta.
-  telemedicine_bias: -2.2
-  booking_bias: -3.2
-
-sentiment:
-  # Sopra questo punteggio l'etichetta e' "positivo", sotto negative_threshold
-  # e' "negativo", in mezzo "neutro". Il punteggio va da -1 a +1.
-  positive_threshold: 0.15
-  negative_threshold: -0.15
-  # Da 0 a 1: sopra questa soglia il messaggio e' considerato una richiesta di
-  # prenotazione di telemedicina.
-  booking_threshold: 0.5
-  # Quanto un allegato conforme rafforza l'ipotesi "prenotazione".
-  attachment_bonus: 0.15
+  # Alzare per evitare OCR su messaggi poco pertinenti; 0 = sempre.
+  min_percent_for_ocr: 0
 
 logging:
   level: "INFO"
-  # Modello del nome: con per_session attivo ogni avvio scrive il proprio file,
-  # con data e ora di inizio nel nome (logs/servizio-20250521-091500.log).
   file: "logs/servizio.log"
-  # false = si torna a un unico file cumulativo (quello indicato sopra).
   per_session: true
-  # Quanti log di sessione conservare: i piu' vecchi vengono cancellati.
-  # 0 = non cancellare nulla.
   keep_sessions: 30
-
-# Click automatico sul popup di conferma di Power Automate Desktop.
-# Quando un flow viene avviato da .lnk, PAD mostra una finestra che chiede
-# "Continue" prima di eseguire. Questa sezione gestisce il click automatico
-# con blocco temporaneo dell'input utente (pywinauto, solo Windows).
-flow_popup:
-  # true = cerca e clicca "Continue" dopo l'avvio del flusso.
-  # false = ignora il popup (utile per debug o se PAD non lo mostra).
-  # Per saltarlo solo nella sessione corrente: `serve --skip`.
-  auto_continue: true
-  # Testo (o regex) del titolo della finestra di conferma.
-  popup_title: "Power Automate"
-  # Testo del pulsante da cliccare.
-  popup_button: "Continua"
-  # Secondi massimi di attesa per la comparsa del popup.
-  popup_timeout: 10

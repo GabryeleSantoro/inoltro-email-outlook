@@ -222,9 +222,9 @@
     "semantic_hash": ""
   },
   "config.example.yaml": {
-    "mtime": 1789121996.039078,
-    "seen": 1789462925.865467,
-    "ast_hash": "8604b084562c5bcb9368da95ca61f68d",
+    "mtime": 1789543676.1827493,
+    "seen": 1789543719.5239773,
+    "ast_hash": "04e494f5bf28c5282f10fdcea3d0288d",
     "semantic_hash": ""
   },
   "requirements-dev.txt": {
