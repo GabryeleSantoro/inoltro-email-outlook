@@ -38,6 +38,17 @@ class EmailSessionReport:
     ) -> None:
         self._add("SCARTATA", message_key, received_at, subject, reason)
 
+    def auto_reply(
+        self,
+        *,
+        message_key: str,
+        received_at: str,
+        subject: str,
+        reason: str,
+    ) -> None:
+        """Registra una risposta automatica preparata dal servizio."""
+        self._add("AUTORISPOSTA", message_key, received_at, subject, reason)
+
     def analyzed(
         self,
         email: InboundEmail,
@@ -82,6 +93,7 @@ class EmailSessionReport:
         labels = (
             ("DA_INOLTRARE", "EMAIL DA INOLTRARE"),
             ("NON_INOLTRATA", "EMAIL ANALIZZATE, NON INOLTRATE"),
+            ("AUTORISPOSTA", "EMAIL CON AUTORISPOSTA PREPARATA"),
             ("SCARTATA", "EMAIL SCARTATE"),
         )
         for state, label in labels:
@@ -103,10 +115,12 @@ class EmailSessionReport:
             for reason, count in Counter(item.reason for item in discarded).most_common():
                 logger.info("  - %s: %d", reason, count)
         logger.info(
-            "TOTALI | ricevute=%d | da_inoltrare=%d | non_inoltrate=%d | scartate=%d",
+            "TOTALI | ricevute=%d | da_inoltrare=%d | non_inoltrate=%d | "
+            "autorisposte=%d | scartate=%d",
             len(records),
             sum(item.stato == "DA_INOLTRARE" for item in records),
             sum(item.stato == "NON_INOLTRATA" for item in records),
+            sum(item.stato == "AUTORISPOSTA" for item in records),
             len(discarded),
         )
 

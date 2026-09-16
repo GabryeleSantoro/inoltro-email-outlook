@@ -56,6 +56,7 @@ def test_forma_graph_del_corpo_e_del_mittente() -> None:
 
     assert email.body_text == "Testo del messaggio"
     assert email.sender == "medico@example.com"
+    assert email.sender_name == "Studio"
 
 
 def test_legge_destinatari_tos_e_ccs_in_forme_diverse() -> None:

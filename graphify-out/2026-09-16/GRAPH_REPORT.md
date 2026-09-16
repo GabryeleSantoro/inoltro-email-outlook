@@ -1,7 +1,7 @@
 # Graph Report - inoltro-email-outlook  (2026-09-16)
 
 ## Corpus Check
-- 50 files · ~40,929 words
+- 50 files · ~40,846 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

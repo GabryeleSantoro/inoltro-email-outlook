@@ -22,7 +22,8 @@ Terminata con successo l'azione scelta dal flusso, `POST /registra-email` riceve
 lo stesso payload e lo salva nel registro locale.
 
 Il codice di stato dice subito com'e' andata: **200** quando e' certamente una
-prenotazione di telemedicina, **202** in tutti gli altri casi analizzati.
+prenotazione di telemedicina con documentazione, **203** quando serve chiedere la
+ricetta, **202** negli altri casi analizzati.
 
 La risposta e' un JSON che il flusso Power Automate puo' usare per decidere cosa
 fare: inoltrare, aprire una pratica, rispondere al paziente o ignorare. Il
@@ -58,8 +59,8 @@ Power Automate (nuova email)  --POST /analizza-email-->  registro SQLite
                           percentuali: telemedicina + prenotazione
                                     + sentiment
                                                   |
-                    200 se prenotazione certa, altrimenti 202
-                        (il verdetto e' nel corpo in entrambi i casi)
+                    200 se certa e conforme, 203 se manca ricetta,
+                    202 negli altri casi (verdetto sempre nel corpo)
 
 Power Automate (azione conclusa) --POST /registra-email--> registro SQLite
                         (stesso payload, nessuna analisi/OCR)
@@ -190,7 +191,7 @@ Le voci da rivedere subito:
 | `local_files.search_directories` | dove cercare il file per nome se il percorso non esiste |
 | `confidence.telemedicine_threshold` | sopra questa percentuale il messaggio "e' telemedicina" |
 | `confidence.booking_threshold` | sopra questa percentuale "e' una prenotazione" |
-| `confidence.certainty_threshold` | sopra questa percentuale la prenotazione e' *certa*: e' cio' che fa rispondere `200` |
+| `confidence.certainty_threshold` | sopra questa percentuale la prenotazione e' *certa*: con documento conforme fa rispondere `200`, altrimenti `203` |
 | `confidence.min_percent_for_ocr` | sotto questa percentuale non si chiama l'OCR |
 | `sentiment.booking_threshold` | sopra questa soglia il messaggio e' "una prenotazione" (punteggio storico, da `0` a `1`) |
 | `api.host` / `api.port` | dove ascolta il servizio (le variabili `API_HOST` e `PORT` hanno la precedenza) |
@@ -398,7 +399,8 @@ Valori possibili di `esito`:
 | `conforme` | screening superato e documento con tutti i criteri (`conforme: true`) |
 | `non_conforme` | screening superato, ma nessun documento contiene i criteri |
 | `scartata` | oggetto e corpo non parlano di telemedicina: nessun OCR eseguito |
-| `senza_contenuto` | nessun allegato o foto leggibile (assente, tipo non previsto, OCR fallito) |
+| `senza_contenuto` | nessun allegato o foto leggibile (tipo non previsto, OCR fallito; per una prenotazione certa senza documento conforme prevale `ricetta_mancante`) |
+| `ricetta_mancante` | prenotazione certa di televisita, ma nessun documento conforme: HTTP `203` e campo `autorisposta` pronto per Power Automate |
 | `errore` | analisi interrotta: il motivo e' nel campo `errore` |
 | `ignorata` | email gia' presente nel registro locale (risposta di `/analizza-email` o `/registra-email`) |
 
@@ -407,6 +409,16 @@ e includono `considerata: false` e `motivo: gia_analizzata` (oppure
 `gia_registrato` se arriva direttamente a `/registra-email`). Le email analizzate
 normalmente hanno `considerata: true`; usare questo campo nella condizione di
 Power Automate prima di inoltrare o aprire una pratica.
+
+Se oggetto e corpo identificano con sicurezza una prenotazione di televisita ma
+non arriva alcun documento conforme, `/analizza-email` risponde `203` con
+`esito: ricetta_mancante` e `motivo: ricetta_mancante`. Il campo `autorisposta`
+contiene `destinatario`, `oggetto`, `corpo` e `pronto`: Power Automate puo' usarli
+direttamente nell'azione Outlook di risposta. Il nome viene preso dal mittente
+quando il payload Outlook lo fornisce; in caso contrario il testo usa `utente`.
+La condizione del flow puo' verificare `motivo == 'ricetta_mancante'`; quindi
+nell'azione **Rispondi a un messaggio di posta elettronica** usare
+`autorisposta.destinatario`, `autorisposta.oggetto` e `autorisposta.corpo`.
 
 ### I documenti letti
 
@@ -441,7 +453,7 @@ rispondono a due domande diverse:
 | `telemedicina` | il messaggio riguarda la telemedicina? | `confidence.telemedicine_threshold` |
 | `prenotazione` | e' la prenotazione di una prestazione di telemedicina? | `confidence.booking_threshold` |
 | `prenotazione_telemedicina` | verdetto unico: entrambe sopra soglia | - |
-| `prenotazione_certa` | prenotazione oltre la soglia di *certezza*: fa rispondere `200` | `confidence.certainty_threshold` |
+| `prenotazione_certa` | prenotazione oltre la soglia di *certezza*: con documento conforme fa rispondere `200`, altrimenti `203` | `confidence.certainty_threshold` |
 
 Ogni indizio vale un peso: si sommano e la somma diventa una percentuale. Sono
 tutti riportati in `indizi_a_favore` e `indizi_contrari`, con il punto del
@@ -497,17 +509,18 @@ Il codice dice l'esito senza bisogno di leggere il corpo:
 
 | Codice | Significato |
 |---|---|
-| `200` | **e' una prenotazione di telemedicina**, con sicurezza oltre `confidence.certainty_threshold` |
-| `202` | messaggio analizzato: non e' una prenotazione, o non lo e' con sicurezza sufficiente |
+| `200` | **e' una prenotazione di telemedicina**, con sicurezza oltre `confidence.certainty_threshold` e documento conforme |
+| `202` | messaggio analizzato ma da scartare/ignorare: non e' una prenotazione, sicurezza insufficiente o duplicato |
+| `203` | prenotazione certa senza documento conforme: `autorisposta` pronta per Power Automate |
 | `400` | payload non interpretabile nemmeno dopo le riparazioni |
 | `401` | chiave assente o errata nell'header `X-API-Key` |
 | `413` | richiesta oltre `api.max_request_bytes` |
 
-`200` e `202` portano **entrambi** il verdetto completo nel corpo: il `202` non
-e' un errore, e' l'esito "analizzato, non e' una prenotazione". Gli errori veri
+`200`, `202` e `203` portano il verdetto nel corpo: sono tutti esiti applicativi
+2xx, non errori HTTP. Gli errori veri
 hanno invece la forma `{"errore": "...", "codice": 400}`.
 
-Sono due codici `2xx` per una ragione pratica: **Power Automate considera
+Sono codici `2xx` per una ragione pratica: **Power Automate considera
 fallita l'azione HTTP davanti a un `4xx`**. Usare un codice di errore per dire
 "non e' una prenotazione" manderebbe il flusso in errore e, con i tentativi
 automatici attivi, farebbe rianalizzare lo stesso messaggio consumando altra
@@ -516,7 +529,9 @@ quota OCR.
 Nel flusso si distinguono cosi':
 
 ```
-outputs('HTTP')['statusCode'] uguale a 200   ->  e' una prenotazione, si procede
+outputs('HTTP')['statusCode'] uguale a 200   ->  prenotazione certa e conforme
+outputs('HTTP')['statusCode'] uguale a 203   ->  rispondere chiedendo la ricetta
+outputs('HTTP')['statusCode'] uguale a 202   ->  scartare/ignorare
 ```
 
 La soglia si sposta con `confidence.certainty_threshold` (predefinita `80`).
@@ -581,13 +596,14 @@ che anche i casi intermedi passino senza revisione umana la abbassa.
      > (fra quelli con estensione ammessa) finiscono all'OCR. All'avvio il
      > servizio lo segnala nei log.
 3. **Condizione** sul risultato. Il modo piu' diretto e' il codice di stato:
-   `outputs('HTTP')['statusCode']` uguale a `200` significa "e' certamente una
-   prenotazione di telemedicina". Attenzione: nell'azione HTTP va disattivato
+   `outputs('HTTP')['statusCode']` uguale a `200` significa "prenotazione certa
+   con documento conforme". Attenzione: nell'azione HTTP va disattivato
    *"Considera come esito negativo"* per i codici diversi da 200, altrimenti il
-   `202` interrompe il flusso.
+   `202` o `203` interrompono il flusso.
 
    Se servono distinzioni piu' fini, i campi del corpo restano disponibili:
-   - `body('HTTP')?['prenotazione_certa']` -> lo stesso verdetto del `200`;
+   - `body('HTTP')?['prenotazione_certa']` -> sicurezza della prenotazione,
+     che puo' essere `true` anche con `203` quando manca la ricetta;
    - `body('HTTP')?['prenotazione_telemedicina']` -> prenotazione probabile,
      sopra la soglia di conferma ma non necessariamente di certezza: e' il
      gruppo da far guardare a una persona;
@@ -595,8 +611,10 @@ che anche i casi intermedi passino senza revisione umana la abbassa.
      la telemedicina, a qualunque titolo;
    - `body('HTTP')?['conforme']` uguale a `true` -> un allegato contiene tutti i
      criteri (`telemedicina` + `1501A`).
-4. **Azione conclusiva** a scelta: *Inoltra messaggio*, creazione di un
-   elemento in un elenco, notifica in Teams, risposta automatica al paziente.
+4. **Azione conclusiva** a scelta: per `statusCode == 203` e
+   `motivo == 'ricetta_mancante'` usare
+   l'azione Outlook con i tre campi di `autorisposta`; per `200` inoltrare il
+   messaggio o aprire la pratica.
 5. **Registra messaggio gestito**: solo dopo che l'azione conclusiva e' riuscita,
    aggiungere una seconda azione HTTP con lo **stesso corpo** dell'analisi:
    - Metodo: `POST`

@@ -166,7 +166,7 @@ class ConfidenceSettings:
     # sempre tutto, che e' l'impostazione predefinita.
     min_percent_for_ocr: float = 0.0
     # Sopra questa percentuale la prenotazione e' considerata *certa* ed e' cio'
-    # che fa rispondere 200 invece di 202. Deve stare sopra booking_threshold:
+    # che fa rispondere 200 invece di 203/202. Deve stare sopra booking_threshold:
     # "confermata" e "certa" sono due gradi diversi di sicurezza.
     certainty_threshold: float = 80.0
     # Termini costanti dei due punteggi: piu' sono negativi, piu' servono

@@ -99,6 +99,7 @@ class InboundEmail:
     message_id: str = ""
     internet_message_id: str = ""
     sender: str = ""
+    sender_name: str = ""
     received_at: str = ""
     # Destinatari estratti dai campi ``tos`` e ``ccs`` del flusso.
     tos: List[str] = field(default_factory=list)

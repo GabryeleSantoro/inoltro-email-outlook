@@ -15,6 +15,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, List, Mapping, Optional, Tuple
@@ -29,7 +30,7 @@ from ..config import Settings
 from ..flow_runner import FlowRunner
 from ..inbound import InboundError, parse_email
 from ..message_guard import LocalMessageStore
-from ..models import InboundEmail
+from ..models import EmailAnalysis, InboundEmail
 from ..ocr.extractor import TextExtractor
 from ..ocr.paddle import PaddleOcrClient
 from ..rawjson import RawJsonError, loads_tolerant
@@ -47,9 +48,10 @@ RICHIESTA_TROPPO_GRANDE = 413
 # 200 = e' una prenotazione di telemedicina, con la sicurezza necessaria per
 #       agire senza che una persona guardi il messaggio;
 # 202 = messaggio analizzato correttamente, ma non e' una prenotazione (o non
-#       lo e' abbastanza da esserne certi).
+#       lo e' abbastanza da esserne certi), oppure messaggio ignorato.
+# 203 = prenotazione certa, ma serve la ricetta: il corpo contiene autorisposta.
 #
-# Sono due codici 2xx apposta. Power Automate considera *fallita* l'azione HTTP
+# Sono codici 2xx apposta. Power Automate considera *fallita* l'azione HTTP
 # davanti a un 4xx: il flusso finirebbe in errore e, con i tentativi automatici
 # attivi, rianalizzerebbe lo stesso messaggio consumando altra CPU. "Non
 # e' una prenotazione" e' un esito legittimo dell'analisi, non un errore della
@@ -58,7 +60,9 @@ ANALISI_CERTA = 200
 ANALISI_SENZA_PRENOTAZIONE = 202
 MESSAGGIO_IGNORATO = 202
 MESSAGGIO_REGISTRATO = 201
+AUTORISPOSTA_RICETTA = 203
 MOTIVO_SENZA_ALLEGATI = "senza_allegati"
+MOTIVO_RICETTA_MANCANTE = "ricetta_mancante"
 DESTINATARIO_ESCLUSO_DALL_INOLTRO = "telemedicina.prenota@aslsalerno.it"
 MOTIVO_DESTINATARIO_ESCLUSO = "destinatario_telemedicina_prenota"
 DEFAULT_MESSAGE_STORE_PATH = Path("data") / "checked_messages.sqlite3"
@@ -227,7 +231,8 @@ def create_app(
             "telemedicina/televisita in oggetto e corpo, legge PDF e immagini "
             "cercando i criteri configurati e calcola le percentuali di "
             "sicurezza. Risponde 200 quando e' certamente una prenotazione di "
-            "telemedicina, 202 in tutti gli altri casi analizzati."
+            "telemedicina con documento conforme, 203 quando serve chiedere la "
+            "ricetta, 202 negli altri casi."
         ),
         lifespan=lifespan,
     )
@@ -293,6 +298,10 @@ def create_app(
                                "e' bloccato dal destinatario. "
                                "Il verdetto completo e' nel corpo della risposta.",
             },
+            AUTORISPOSTA_RICETTA: {
+                "description": "Prenotazione certa senza documento conforme: il "
+                               "campo 'autorisposta' e' pronto per Power Automate.",
+            },
         },
         openapi_extra={
             "requestBody": {
@@ -324,15 +333,9 @@ def create_app(
                 "JSON non valido riparato in lettura: " + "; ".join(repairs)
             )
 
-        # Senza un allegato non c'e' documentazione da verificare. Il motivo
-        # stabile permette al flusso di predisporre in futuro un autoreply che
-        # chieda la ricetta, senza inviare alcun messaggio da questo servizio.
-        if not email.attachments:
-            return _without_attachments_response(request, email)
-
         # Il flusso registra il messaggio soltanto dopo aver completato le
         # proprie azioni. Ai tentativi successivi il controllo deve stare qui,
-        # prima dell'OCR e prima di qualunque risposta 200.
+        # prima dell'OCR e prima di qualunque risposta operativa.
         if not dev_mode and request.app.state.message_store.contains(payload):
             logger.info("Email gia' analizzata: %s. OCR non avviato.", email.key)
             return JSONResponse(
@@ -340,7 +343,20 @@ def create_app(
                 status_code=MESSAGGIO_IGNORATO,
             )
 
+        # Senza allegati non c'e' OCR da eseguire, ma il testo puo' essere
+        # abbastanza esplicito da preparare una richiesta automatica della ricetta.
+        if not email.attachments:
+            analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+            if analysis.prenotazione_certa:
+                return _missing_recipe_response(request, email, analysis)
+            return _without_attachments_response(request, email)
+
         analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+
+        # Un allegato presente non basta: se nessun documento soddisfa i criteri,
+        # una prenotazione certa ha comunque bisogno della ricetta/impegnativa.
+        if analysis.prenotazione_certa and not analysis.conforme:
+            return _missing_recipe_response(request, email, analysis)
 
         forwarding_block_reason = _forwarding_block_reason(email)
         inoltrabile = forwarding_block_reason is None
@@ -434,7 +450,9 @@ def create_app(
         email, payload, repairs = await _read_email_request(request, settings)
 
         if not email.attachments:
-            return _without_attachments_response(request, email)
+            analysis = await run_in_threadpool(request.app.state.analyzer.analyze, email)
+            if not analysis.prenotazione_certa:
+                return _without_attachments_response(request, email)
 
         if dev_mode:
             logger.info(
@@ -552,6 +570,67 @@ def _without_attachments_response(request: Request, email: InboundEmail) -> JSON
         _ignored_message(email.key, email.subject, MOTIVO_SENZA_ALLEGATI),
         status_code=MESSAGGIO_IGNORATO,
     )
+
+
+def _missing_recipe_response(
+    request: Request, email: InboundEmail, analysis: EmailAnalysis
+) -> JSONResponse:
+    """Prepara una risposta Power Automate per una prenotazione senza ricetta."""
+    name = _reply_name(email)
+    recipient = (
+        email.sender
+        if re.fullmatch(r"[^@\s<>]+@[^@\s<>]+", email.sender)
+        else None
+    )
+    message = {
+        "destinatario": recipient,
+        "oggetto": "Ricetta necessaria per la prenotazione della televisita",
+        "corpo": (
+            f"Gentile {name},\n\n"
+            "abbiamo ricevuto la tua richiesta di prenotazione per una televisita, "
+            "ma non abbiamo trovato la ricetta o l'impegnativa in allegato.\n\n"
+            "Per poter procedere con la prenotazione, rispondi a questa email "
+            "allegando la ricetta o l'impegnativa in formato PDF o immagine.\n\n"
+            "Grazie."
+        ),
+        "pronto": recipient is not None,
+    }
+    body = analysis_to_dict(
+        analysis,
+        include_text=False,
+        tos=email.tos,
+        ccs=email.ccs,
+        inoltrabile=False,
+        motivo_non_inoltro=MOTIVO_RICETTA_MANCANTE,
+    )
+    body.update({
+        "esito": MOTIVO_RICETTA_MANCANTE,
+        "considerata": True,
+        "motivo": MOTIVO_RICETTA_MANCANTE,
+        "autorisposta": message,
+    })
+    request.app.state.email_session_report.auto_reply(
+        message_key=email.key,
+        received_at=email.received_at,
+        subject=email.subject,
+        reason=MOTIVO_RICETTA_MANCANTE,
+    )
+    logger.info(
+        "EMAIL DA RICHIEDERE RICETTA | id=%s | ricevuta_il=%s | oggetto='%s'",
+        email.key, email.received_at or "(data assente)", email.subject or "(senza oggetto)",
+    )
+    return JSONResponse(body, status_code=AUTORISPOSTA_RICETTA)
+
+
+def _reply_name(email: InboundEmail) -> str:
+    """Ricava un saluto umano dal nome Outlook o dalla parte locale dell'email."""
+    if email.sender_name.strip():
+        return email.sender_name.strip()
+    local = email.sender.split("@", 1)[0].strip()
+    if not local:
+        return "utente"
+    parts = [part for part in re.split(r"[._+\-]+", local) if part]
+    return " ".join(part.capitalize() for part in parts) or "utente"
 
 
 def _forwarding_block_reason(email: InboundEmail) -> Optional[str]:

@@ -131,25 +131,69 @@ def test_altri_destinatari_non_bloccano_l_inoltro(client: TestClient) -> None:
     assert corpo["motivo_non_inoltro"] is None
 
 
-def test_email_senza_allegati_non_arriva_all_analizzatore(settings: Settings) -> None:
-    class AnalyzerMustNotRun:
-        def analyze(self, _email):
-            raise AssertionError("un messaggio senza allegati non va analizzato")
+def test_prenotazione_certa_senza_allegati_prepara_autorisposta(client: TestClient) -> None:
+    risposta = client.post("/analizza-email", json=email_payload(
+        **{
+            "from": {
+                "emailAddress": {
+                    "address": "mario.rossi@example.com",
+                    "name": "Mario Rossi",
+                }
+            }
+        }
+    ))
 
-    with TestClient(create_app(settings, analyzer=AnalyzerMustNotRun())) as instance:
-        risposta = instance.post("/analizza-email", json=email_payload())
-
-    assert risposta.status_code == 202
+    assert risposta.status_code == 203
     corpo = risposta.json()
     assert corpo["id_messaggio"].startswith("<msg-")
     assert corpo["oggetto"] == "Richiesta prenotazione televisita"
+    assert corpo["esito"] == "ricetta_mancante"
+    assert corpo["considerata"] is True
+    assert corpo["motivo"] == "ricetta_mancante"
+    assert corpo["autorisposta"] == {
+        "destinatario": "mario.rossi@example.com",
+        "oggetto": "Ricetta necessaria per la prenotazione della televisita",
+        "corpo": (
+            "Gentile Mario Rossi,\n\n"
+            "abbiamo ricevuto la tua richiesta di prenotazione per una televisita, "
+            "ma non abbiamo trovato la ricetta o l'impegnativa in allegato.\n\n"
+            "Per poter procedere con la prenotazione, rispondi a questa email "
+            "allegando la ricetta o l'impegnativa in formato PDF o immagine.\n\n"
+            "Grazie."
+        ),
+        "pronto": True,
+    }
+
+
+def test_email_senza_allegati_non_prenotazione_resta_ignorata(client: TestClient) -> None:
+    risposta = client.post("/analizza-email", json=email_payload(
+        subject="Comunicazione",
+        body="Buongiorno, vi informo di una variazione.",
+    ))
+
+    assert risposta.status_code == 202
+    corpo = risposta.json()
     assert corpo["esito"] == "ignorata"
     assert corpo["considerata"] is False
     assert corpo["motivo"] == "senza_allegati"
 
 
-def test_registra_email_senza_allegati_viene_ignorata(client: TestClient) -> None:
+def test_registra_email_senza_allegati_prenotazione_certa_viene_registrata(
+    client: TestClient,
+) -> None:
     risposta = client.post("/registra-email", json=email_payload())
+
+    assert risposta.status_code == 201
+    assert risposta.json()["registrata"] is True
+
+
+def test_registra_email_senza_allegati_non_prenotazione_viene_ignorata(
+    client: TestClient,
+) -> None:
+    risposta = client.post("/registra-email", json=email_payload(
+        subject="Comunicazione",
+        body="Buongiorno, vi informo di una variazione.",
+    ))
 
     assert risposta.status_code == 202
     assert risposta.json()["considerata"] is False
@@ -359,9 +403,13 @@ def test_email_senza_documento_conforme(client: TestClient, settings: Settings) 
         settings, TextExtractor(settings, FakeOcrClient(default_text="Referto di visita"))
     )
     with TestClient(create_app(settings, analyzer=analyzer)) as altro_client:
-        corpo = altro_client.post("/analizza-email", json=payload).json()
+        risposta = altro_client.post("/analizza-email", json=payload)
 
-    assert corpo["esito"] == "non_conforme"
+    assert risposta.status_code == 203
+    corpo = risposta.json()
+    assert corpo["esito"] == "ricetta_mancante"
+    assert corpo["motivo"] == "ricetta_mancante"
+    assert corpo["autorisposta"]["pronto"] is True
     assert corpo["criteri"]["mancanti"] == ["telemedicina", "1501A"]
 
 
@@ -415,8 +463,8 @@ def test_chiave_corretta_accettata(client_protetto: TestClient) -> None:
     risposta = client_protetto.post(
         "/analizza-email", json=email_payload(), headers={"X-API-Key": "chiave-condivisa"}
     )
-    assert risposta.status_code == 202
-    assert risposta.json()["motivo"] == "senza_allegati"
+    assert risposta.status_code == 203
+    assert risposta.json()["motivo"] == "ricetta_mancante"
 
 
 def test_chiave_mancante_rifiutata(client_protetto: TestClient) -> None:
@@ -479,10 +527,10 @@ def test_payload_non_valido_del_flusso_viene_riparato(client: TestClient) -> Non
         headers={"content-type": "application/json"},
     )
 
-    assert risposta.status_code == 202
+    assert risposta.status_code == 203
     corpo = risposta.json()
     assert corpo["oggetto"] == "Richiesta prenotazione televisita"
-    assert corpo["motivo"] == "senza_allegati"
+    assert corpo["motivo"] == "ricetta_mancante"
 
 
 def test_allegato_indicato_per_percorso_arriva_all_ocr(
@@ -681,7 +729,8 @@ def test_la_soglia_di_certezza_e_configurabile(
             attachments=[attachment_payload("nota.txt", b"nota", content_type="text/plain")],
         ))
 
-    assert risposta.status_code == 200
+    assert risposta.status_code == 203
+    assert risposta.json()["motivo"] == "ricetta_mancante"
     assert risposta.json()["prenotazione_certa"] is True
 
 

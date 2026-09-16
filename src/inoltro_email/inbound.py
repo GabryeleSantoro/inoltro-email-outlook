@@ -142,13 +142,16 @@ def parse_email(
             if max_attachment_bytes is None or item.size_bytes <= max_attachment_bytes
         )
 
+    sender, sender_name = _read_sender(data)
+
     return InboundEmail(
         subject=subject,
         body_text=body_text,
         body_html=body_html,
         message_id=_as_text(data.get("id") or data.get("messageId")),
         internet_message_id=_as_text(data.get("internetMessageId") or data.get("messageId")),
-        sender=_read_sender(data),
+        sender=sender,
+        sender_name=sender_name,
         received_at=_as_text(
             data.get("receivedDateTime") or data.get("received") or data.get("date")
         ),
@@ -533,20 +536,29 @@ def _ensure_name(name: str, content_type: str, index: int, inline: bool) -> str:
 # --------------------------------------------------------------------- utili
 
 
-def _read_sender(data: "_CaseInsensitive") -> str:
+def _read_sender(data: "_CaseInsensitive") -> Tuple[str, str]:
     for key in ("from", "sender", "fromAddress"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip()
+            return _split_sender(value.strip())
         if isinstance(value, Mapping):
             inner = _CaseInsensitive(value)
             address = inner.get("emailAddress")
             if isinstance(address, Mapping):
                 inner = _CaseInsensitive(address)
-            found = _as_text(inner.get("address") or inner.get("name"))
-            if found:
-                return found
-    return ""
+            found_address = _as_text(inner.get("address"))
+            found_name = _as_text(inner.get("name"))
+            if found_address or found_name:
+                return found_address or found_name, found_name if found_address else ""
+    return "", ""
+
+
+def _split_sender(value: str) -> Tuple[str, str]:
+    """Separa un mittente semplice dal nome visualizzato, se presente."""
+    match = re.match(r"^\s*(.*?)\s*<([^<>@\s]+@[^<>\s]+)>\s*$", value)
+    if match:
+        return match.group(2).strip(), match.group(1).strip().strip('"')
+    return value, ""
 
 
 def _read_recipients(value: Any) -> List[str]:
